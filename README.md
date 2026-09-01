@@ -10,6 +10,7 @@
 - `engines/brush/`：官方 Brush 源码。
 - `docs/`：架构、流程、Ubuntu 部署和方案文档。
 - `scripts/`：前端、后端、COLMAP、Brush 的部署脚本。
+- `docker/`：基于 CUDA runtime 的单镜像 GPU 容器定义。
 
 ## 建模流程
 
@@ -53,3 +54,9 @@ root 执行时 systemd 中的 API/Worker 和前端服务也会以 root 运行。
 - [`docs/architecture.md`](./docs/architecture.md)
 - [`docs/folder-layout.md`](./docs/folder-layout.md)
 - [`docs/视频重建Gaussian方案对比与推荐.md`](./docs/视频重建Gaussian方案对比与推荐.md)
+
+当前服务器已有 CUDA 12.4.1 runtime 镜像时，容器部署入口为：
+
+```bash
+docker compose -p gaussian -f docker/compose.yml up -d --build
+```

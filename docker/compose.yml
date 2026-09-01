@@ -1,0 +1,24 @@
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+      args:
+        CUDA_BUILD_IMAGE: ${CUDA_BUILD_IMAGE:-swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.4.1-devel-ubuntu22.04}
+        CUDA_RUNTIME_IMAGE: ${CUDA_RUNTIME_IMAGE:-swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.4.1-runtime-ubuntu22.04}
+        COLMAP_REF: ${COLMAP_REF:-main}
+        BRUSH_REF: ${BRUSH_REF:-main}
+        CUDA_ARCH: ${CUDA_ARCH:-89}
+        NEXT_PUBLIC_GAUSSIAN_DEMO: ${NEXT_PUBLIC_GAUSSIAN_DEMO:-false}
+    environment:
+      GAUSSIAN_DATA_ROOT: /app/runtime/data
+      GAUSSIAN_MAX_WORKERS: ${GAUSSIAN_MAX_WORKERS:-1}
+    volumes:
+      - gaussian-data:/app/runtime/data
+    ports:
+      - "${HTTP_PORT:-8080}:4177"
+    gpus: all
+    restart: unless-stopped
+
+volumes:
+  gaussian-data:

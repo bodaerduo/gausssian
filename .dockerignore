@@ -1,0 +1,12 @@
+.git
+front/node_modules
+front/.next
+front/.vinext
+front/.wrangler
+front/dist
+backend/.venv
+backend/__pycache__
+runtime
+data
+engines
+site

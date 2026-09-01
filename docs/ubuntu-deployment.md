@@ -2,6 +2,8 @@
 
 本文用于无法由本地代理直接登录服务器的场景：将整个 `gaussian/` 项目上传到 Ubuntu，然后在服务器终端执行脚本。
 
+如果宿主机 APT 存在依赖冲突，优先使用 [Docker GPU 容器部署](./container-deployment.md)，不要继续在宿主机安装 COLMAP 编译依赖。
+
 ## 1. 部署前提
 
 - Ubuntu 22.04/24.04。

@@ -24,6 +24,10 @@ gaussian/
 │   ├── setup-backend-ubuntu.sh
 │   ├── setup-colmap-ubuntu.sh
 │   └── setup-brush-ubuntu.sh
+├── docker/                # 单镜像 GPU 容器定义
+│   ├── backend.Dockerfile
+│   ├── compose.yml
+│   └── start.sh
 ├── AGENTS.md              # 协作约束、验收标准和流程
 └── README.md              # 项目入口说明
 ```

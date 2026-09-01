@@ -2,7 +2,7 @@
 
 ## 目录约定
 
-本项目按运行职责拆分为 `front/`、`backend/`、`engines/`、`docs/` 和 `scripts/`。源码、部署脚本和文档都以项目根目录为相对基准，不写死某台机器的绝对路径。
+本项目按运行职责拆分为 `front/`、`backend/`、`engines/`、`docs/`、`scripts/` 和 `docker/`。源码、部署脚本和文档都以项目根目录为相对基准，不写死某台机器的绝对路径。
 
 ```text
 gaussian/
@@ -13,6 +13,7 @@ gaussian/
 │   └── brush/             # Brush 源码
 ├── docs/                  # 架构、流程、Ubuntu 部署、方案文档
 ├── scripts/               # 部署与引擎安装脚本
+├── docker/                # 单镜像 GPU 容器定义
 ├── AGENTS.md              # 本文件
 └── README.md              # 项目入口
 ```
@@ -67,6 +68,14 @@ APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
 systemd 服务将以 root 运行；脚本也兼容有 sudo 权限的普通用户。
 
 所有脚本都默认通过自身位置计算项目根目录；如脚本和项目不在同一目录，可显式传入 `APP_DIR=/path/to/gaussian`。
+
+如果宿主机 APT 依赖异常，优先使用 Docker GPU 部署：
+
+```bash
+docker compose -p gaussian -f docker/compose.yml up -d --build
+```
+
+容器方案说明见 `docs/container-deployment.md`。
 
 ## 验收标准
 
