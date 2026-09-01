@@ -27,6 +27,13 @@ chmod +x scripts/*.sh
 DEMO_MODE=false ./scripts/deploy-all-ubuntu.sh
 ```
 
+如果服务器已安装 CUDA toolkit 且 `nvcc --version` 正常，推荐使用：
+
+```bash
+APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
+./scripts/deploy-all-ubuntu.sh
+```
+
 脚本默认按自身位置识别项目根目录，不依赖固定的服务器绝对路径。也可以使用 `APP_DIR=/path/to/gaussian` 指定项目目录。
 
 `engines/colmap/` 和 `engines/brush/` 为可选的本地源码缓存，已加入 Git 忽略；部署服务器没有源码时，安装脚本会从官方仓库自动拉取。

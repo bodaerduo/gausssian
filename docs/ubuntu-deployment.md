@@ -114,6 +114,19 @@ sudo systemctl status gaussian-web --no-pager
 APP_DIR="$APP_DIR" DEMO_MODE=false ./scripts/deploy-all-ubuntu.sh
 ```
 
+如果服务器已安装 CUDA toolkit，并且以下命令能正常输出版本：
+
+```bash
+nvcc --version
+```
+
+则推荐关闭脚本中的 CUDA toolkit 安装步骤：
+
+```bash
+APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
+./scripts/deploy-all-ubuntu.sh
+```
+
 该脚本依次执行 COLMAP、Brush、后端、前端四个步骤；任一步失败都会停止。
 
 ## 7. Nginx 反向代理

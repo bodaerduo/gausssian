@@ -50,6 +50,13 @@ DEMO_MODE=false ./scripts/deploy-front-ubuntu.sh
 DEMO_MODE=false ./scripts/deploy-all-ubuntu.sh
 ```
 
+服务器已安装 CUDA toolkit、且 `nvcc --version` 正常时，使用：
+
+```bash
+APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
+./scripts/deploy-all-ubuntu.sh
+```
+
 所有脚本都默认通过自身位置计算项目根目录；如脚本和项目不在同一目录，可显式传入 `APP_DIR=/path/to/gaussian`。
 
 ## 验收标准
