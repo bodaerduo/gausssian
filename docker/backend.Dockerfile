@@ -8,8 +8,20 @@ ARG BRUSH_REF=main
 ARG CUDA_ARCH=89
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates curl git cmake ninja-build build-essential pkg-config \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+RUN git clone --depth 1 --branch "${COLMAP_REF}" \
+    https://github.com/colmap/colmap.git colmap
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
+    curl cmake ninja-build build-essential pkg-config \
     libboost-program-options-dev libboost-graph-dev libboost-system-dev \
     libeigen3-dev libopenimageio-dev libopenexr-dev libmetis-dev \
     libgoogle-glog-dev libgtest-dev libgmock-dev libsqlite3-dev \
@@ -18,9 +30,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libvulkan-dev \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /src
-RUN git clone --depth 1 --branch "${COLMAP_REF}" \
-    https://github.com/colmap/colmap.git colmap
 RUN cmake -S /src/colmap -B /build/colmap -GNinja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr/local \
@@ -34,7 +43,11 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --pr
 ENV PATH=/root/.cargo/bin:${PATH}
 RUN git clone --depth 1 --branch "${BRUSH_REF}" \
     https://github.com/ArthurBrussee/brush.git brush
-RUN cargo build --manifest-path /src/brush/Cargo.toml --release -p brush-cli
+RUN --mount=type=cache,target=/root/.cargo/registry \
+    --mount=type=cache,target=/root/.cargo/git \
+    --mount=type=cache,target=/tmp/brush-target \
+    CARGO_TARGET_DIR=/tmp/brush-target cargo build --manifest-path /src/brush/Cargo.toml --release -p brush-cli \
+    && install -m 0755 /tmp/brush-target/release/brush-cli /usr/local/bin/brush-cli
 
 FROM ${CUDA_RUNTIME_IMAGE} AS runtime
 
@@ -42,7 +55,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip ffmpeg curl ca-certificates \
     libboost-program-options1.74.0 libboost-graph1.74.0 libboost-system1.74.0 \
     libopenimageio2.2 libopenexr25 libmetis5 libgoogle-glog0v5 libgflags2.2 \
@@ -59,7 +74,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/bin/colmap /usr/local/bin/colmap
-COPY --from=builder /src/brush/target/release/brush-cli /usr/local/bin/brush-cli
+COPY --from=builder /usr/local/bin/brush-cli /usr/local/bin/brush-cli
 COPY backend /app/backend
 COPY front /app/front
 COPY docker/start.sh /usr/local/bin/gaussian-start
@@ -69,7 +84,8 @@ RUN python3 -m pip install --no-cache-dir -r /app/backend/requirements.txt
 WORKDIR /app/front
 ARG NEXT_PUBLIC_GAUSSIAN_DEMO=false
 ENV NEXT_PUBLIC_GAUSSIAN_DEMO=${NEXT_PUBLIC_GAUSSIAN_DEMO}
-RUN npm ci && npm run build
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci && npm run build
 
 WORKDIR /app/backend
 ENV GAUSSIAN_DATA_ROOT=/app/runtime/data \

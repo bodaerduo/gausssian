@@ -47,6 +47,8 @@ docker compose -p gaussian -f docker/compose.yml up -d --build
 
 COLMAP 构建依赖已包含 Ubuntu 22.04 对应的 `libopenexr-dev`，用于满足 OpenImageIO 的 CMake 配置检测。
 
+Dockerfile 已启用 APT、Cargo 和 npm 缓存，并将 COLMAP/Brush 源码下载层与依赖安装层分开。后续只要不执行 `docker builder prune` 或更换镜像标签，修正构建依赖时通常不会重新下载源码和已有软件包。首次采用新版 Dockerfile 会因 Dockerfile 本身变化重新计算一次构建层，这是正常的。
+
 访问地址：
 
 ```text
