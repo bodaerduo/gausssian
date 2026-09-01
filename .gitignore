@@ -1,0 +1,16 @@
+/front/node_modules/
+/front/.next/
+/front/.vinext/
+/front/dist/
+/front/.wrangler/
+/front/out/
+/backend/.venv/
+/backend/__pycache__/
+/backend/_smoke_data/
+/engines/colmap/build/
+/engines/brush/target/
+/engines/colmap/
+/engines/brush/
+/runtime/
+/data/
+/site/
