@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # Install/build a CUDA-enabled, headless COLMAP for the Gaussian worker.
-# Prefer a normal user with sudo; root requires ALLOW_ROOT=true.
+# Runs directly as root or through sudo when started by a normal user.
 # Example:
 #   chmod +x setup-colmap-ubuntu.sh
 #   COLMAP_REF=main ./setup-colmap-ubuntu.sh
@@ -20,7 +20,6 @@ COLMAP_PREFIX="${COLMAP_PREFIX:-/usr/local}"
 CUDA_ARCH="${CUDA_ARCH:-native}"
 BUILD_JOBS="${BUILD_JOBS:-$(nproc)}"
 INSTALL_CUDA="${INSTALL_CUDA:-true}"
-ALLOW_ROOT="${ALLOW_ROOT:-false}"
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"
@@ -31,9 +30,7 @@ die() {
   exit 1
 }
 
-if [[ "$(id -u)" == "0" && "$ALLOW_ROOT" != "true" ]]; then
-  die "当前脚本默认禁止 root；如确需 root 执行，请设置 ALLOW_ROOT=true。"
-fi
+as_root() { if [[ "$(id -u)" == "0" ]]; then "$@"; else sudo "$@"; fi; }
 if [[ "$(id -u)" != "0" ]]; then
   command -v sudo >/dev/null 2>&1 || die "未找到 sudo。"
 fi
@@ -43,8 +40,8 @@ command -v nvidia-smi >/dev/null 2>&1 || die "未找到 nvidia-smi，请先安�
 nvidia-smi
 
 log "安装 COLMAP 编译依赖"
-sudo apt-get update
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+as_root apt-get update
+as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y \
   git cmake ninja-build build-essential \
   libboost-program-options-dev libboost-graph-dev libboost-system-dev \
   libeigen3-dev libopenimageio-dev openimageio-tools libmetis-dev \
@@ -55,11 +52,11 @@ sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
 
 # COLMAP's Ubuntu installation guide documents this workaround for the
 # OpenImageIO CMake config.
-sudo mkdir -p /usr/include/opencv4
+as_root mkdir -p /usr/include/opencv4
 
 if [[ "$INSTALL_CUDA" == "true" ]]; then
   log "安装 Ubuntu CUDA toolkit"
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y \
     nvidia-cuda-toolkit nvidia-cuda-toolkit-gcc
 fi
 
@@ -69,7 +66,7 @@ if [[ -f /etc/os-release ]]; then
   # shellcheck disable=SC1091
   source /etc/os-release
   if [[ "${VERSION_ID:-}" == "22.04" ]]; then
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y gcc-10 g++-10
+    as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y gcc-10 g++-10
   fi
 fi
 
@@ -77,8 +74,8 @@ command -v nvcc >/dev/null 2>&1 || die "未找到 nvcc，请确认 CUDA toolkit 
 nvcc --version
 
 log "准备 COLMAP 源码：$COLMAP_REF"
-sudo mkdir -p "$(dirname "$COLMAP_SRC_DIR")"
-sudo chown -R "$(id -un):$(id -gn)" "$(dirname "$COLMAP_SRC_DIR")"
+as_root mkdir -p "$(dirname "$COLMAP_SRC_DIR")"
+as_root chown -R "$(id -un):$(id -gn)" "$(dirname "$COLMAP_SRC_DIR")"
 
 if [[ -d "$COLMAP_SRC_DIR/.git" ]]; then
   if [[ -n "$(git -C "$COLMAP_SRC_DIR" status --porcelain)" ]]; then
@@ -127,8 +124,8 @@ log "编译 COLMAP（并行数：$BUILD_JOBS）"
 ninja -j "$BUILD_JOBS"
 
 log "安装 COLMAP 到 $COLMAP_PREFIX"
-sudo ninja install
-sudo ldconfig
+as_root ninja install
+as_root ldconfig
 
 command -v colmap >/dev/null 2>&1 || die "安装后仍找不到 colmap。"
 colmap -h >/dev/null

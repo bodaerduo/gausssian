@@ -6,7 +6,7 @@
 
 - Ubuntu 22.04/24.04。
 - NVIDIA 驱动已安装，`nvidia-smi` 正常。
-- 部署用户拥有 `sudo` 权限，但不要用 root 运行脚本。
+- 可使用 root 直接部署；普通用户需要拥有 `sudo` 权限。
 - 服务器可访问 GitHub、PyPI、npm 和 Ubuntu 软件源。
 - CUDA toolkit 可通过 `apt` 安装；如果服务器已有 toolkit，可执行 `INSTALL_CUDA=false`。
 
@@ -127,14 +127,14 @@ APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
 ./scripts/deploy-all-ubuntu.sh
 ```
 
-如果当前只能使用 root（例如部署用户没有 sudo 密码），可以显式开启 root 模式：
+如果使用 root 部署，直接执行：
 
 ```bash
-ALLOW_ROOT=true APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
+APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
 ./scripts/deploy-all-ubuntu.sh
 ```
 
-root 模式会让 `gaussian-api` 和 `gaussian-web` systemd 服务以 root 运行，仅建议用于受控服务器；脚本默认仍不允许误用 root。
+root 模式会让 `gaussian-api` 和 `gaussian-web` systemd 服务以 root 运行。脚本同样兼容有 sudo 权限的普通用户。
 
 该脚本依次执行 COLMAP、Brush、后端、前端四个步骤；任一步失败都会停止。
 

@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # gaussian Ubuntu deployment helper.
-# Prefer the deployment user; root requires ALLOW_ROOT=true.
+# Runs directly as root or through sudo when started by a normal user.
 # Example:
 #   chmod +x scripts/deploy-front-ubuntu.sh
 #   DEMO_MODE=true ./scripts/deploy-front-ubuntu.sh
@@ -18,7 +18,6 @@ API_URL="${API_URL:-}"
 INSTALL_SYSTEM_DEPS="${INSTALL_SYSTEM_DEPS:-true}"
 INSTALL_SERVICE="${INSTALL_SERVICE:-true}"
 SERVICE_NAME="${SERVICE_NAME:-gaussian-web}"
-ALLOW_ROOT="${ALLOW_ROOT:-false}"
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"
@@ -29,11 +28,10 @@ die() {
   exit 1
 }
 
-if [[ "$(id -u)" == "0" && "$ALLOW_ROOT" != "true" ]]; then
-  die "当前脚本默认禁止 root；如确需 root 执行，请设置 ALLOW_ROOT=true。"
+as_root() { if [[ "$(id -u)" == "0" ]]; then "$@"; else sudo "$@"; fi; }
+if [[ "$(id -u)" != "0" ]]; then
+  command -v sudo >/dev/null 2>&1 || die "未找到 sudo，请先安装 sudo 或使用有 sudo 权限的部署用户。"
 fi
-
-command -v sudo >/dev/null 2>&1 || die "未找到 sudo，请先安装 sudo 或使用有 sudo 权限的部署用户。"
 [[ -d "$APP_DIR" ]] || die "项目目录不存在：$APP_DIR"
 [[ -f "$FRONT_DIR/package.json" ]] || die "$FRONT_DIR/package.json 不存在，请确认前端目录已准备。"
 [[ -f "$FRONT_DIR/package-lock.json" ]] || die "$FRONT_DIR/package-lock.json 不存在，生产部署需要锁文件。"
@@ -44,8 +42,8 @@ NODE_VERSION="$(tr -d '[:space:]' < "$FRONT_DIR/.nvmrc")"
 
 if [[ "$INSTALL_SYSTEM_DEPS" == "true" ]]; then
   log "安装 Ubuntu 基础依赖"
-  sudo apt-get update
-  sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  as_root apt-get update
+  as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y \
     curl ca-certificates build-essential nginx ffmpeg
 fi
 
@@ -98,7 +96,7 @@ if [[ "$INSTALL_SERVICE" == "true" ]]; then
 
   log "安装 systemd 服务 $SERVICE_NAME"
   SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
-  sudo tee "$SERVICE_FILE" >/dev/null <<EOF
+  as_root tee "$SERVICE_FILE" >/dev/null <<EOF
 [Unit]
 Description=gaussian vinext web
 After=network.target
@@ -120,9 +118,9 @@ PrivateTmp=true
 WantedBy=multi-user.target
 EOF
 
-  sudo systemctl daemon-reload
-  sudo systemctl enable --now "$SERVICE_NAME"
-  sudo systemctl --no-pager --full status "$SERVICE_NAME" || true
+  as_root systemctl daemon-reload
+  as_root systemctl enable --now "$SERVICE_NAME"
+  as_root systemctl --no-pager --full status "$SERVICE_NAME" || true
 else
   log "跳过 systemd；手动启动命令："
   printf 'cd %q && source %q && nvm use %q && npm run start -- --hostname 127.0.0.1 --port %q\n' \

@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # Create the Python venv and install the Gaussian API/Worker service.
-# Prefer the deployment user; root requires ALLOW_ROOT=true.
+# Runs directly as root or through sudo when started by a normal user.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
@@ -12,14 +12,11 @@ VENV_DIR="${VENV_DIR:-$BACKEND_DIR/.venv}"
 DATA_ROOT="${GAUSSIAN_DATA_ROOT:-$APP_DIR/runtime/data}"
 API_PORT="${GAUSSIAN_PORT:-4178}"
 SERVICE_NAME="${SERVICE_NAME:-gaussian-api}"
-ALLOW_ROOT="${ALLOW_ROOT:-false}"
 
 die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
 
-if [[ "$(id -u)" == "0" && "$ALLOW_ROOT" != "true" ]]; then
-  die "当前脚本默认禁止 root；如确需 root 执行，请设置 ALLOW_ROOT=true。"
-fi
+as_root() { if [[ "$(id -u)" == "0" ]]; then "$@"; else sudo "$@"; fi; }
 if [[ "$(id -u)" != "0" ]]; then
   command -v sudo >/dev/null 2>&1 || die "未找到 sudo。"
 fi
@@ -27,8 +24,8 @@ fi
 [[ -f "$BACKEND_DIR/requirements.txt" ]] || die "requirements.txt 不存在：$BACKEND_DIR"
 
 log "安装 Python 运行时和 API 基础依赖"
-sudo apt-get update
-sudo DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-pip ffmpeg
+as_root apt-get update
+as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-pip ffmpeg
 
 log "创建 Python 虚拟环境"
 python3 -m venv "$VENV_DIR"
@@ -46,7 +43,7 @@ sed -i \
 
 PYTHON_BIN="$VENV_DIR/bin/python"
 log "安装 systemd 服务 $SERVICE_NAME"
-sudo tee "/etc/systemd/system/${SERVICE_NAME}.service" >/dev/null <<EOF
+as_root tee "/etc/systemd/system/${SERVICE_NAME}.service" >/dev/null <<EOF
 [Unit]
 Description=gaussian GPU API and worker
 After=network.target
@@ -66,9 +63,9 @@ PrivateTmp=true
 WantedBy=multi-user.target
 EOF
 
-sudo systemctl daemon-reload
-sudo systemctl enable --now "$SERVICE_NAME"
-sudo systemctl --no-pager --full status "$SERVICE_NAME" || true
+as_root systemctl daemon-reload
+as_root systemctl enable --now "$SERVICE_NAME"
+as_root systemctl --no-pager --full status "$SERVICE_NAME" || true
 curl --fail --silent --show-error "http://127.0.0.1:${API_PORT}/health" || true
 
 log "后端部署完成"
