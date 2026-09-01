@@ -40,14 +40,15 @@ command -v nvidia-smi >/dev/null 2>&1 || die "未找到 nvidia-smi，请先安�
 nvidia-smi
 
 log "安装 COLMAP 编译依赖"
+# The build below disables COLMAP's GUI, so Qt development packages are not needed.
 as_root apt-get update
 as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y \
   git cmake ninja-build build-essential \
   libboost-program-options-dev libboost-graph-dev libboost-system-dev \
   libeigen3-dev libopenimageio-dev openimageio-tools libmetis-dev \
   libgoogle-glog-dev libgtest-dev libgmock-dev libsqlite3-dev \
-  libglew-dev qt6-base-dev libqt6opengl6-dev libqt6openglwidgets6 \
-  qt6-svg-dev libcgal-dev libceres-dev libsuitesparse-dev \
+  libglew-dev \
+  libcgal-dev libceres-dev libsuitesparse-dev \
   libcurl4-openssl-dev libssl-dev libmkl-full-dev
 
 # COLMAP's Ubuntu installation guide documents this workaround for the
