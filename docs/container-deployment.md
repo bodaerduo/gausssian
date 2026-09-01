@@ -45,6 +45,8 @@ docker compose -p gaussian -f docker/compose.yml up -d --build
 
 首次构建会拉取 `devel` 镜像、编译 COLMAP、编译 Brush、构建前端，预计 30–90 分钟；后续只启动已有镜像通常为数秒到数分钟。
 
+COLMAP 构建依赖已包含 Ubuntu 22.04 对应的 `libopenexr-dev`，用于满足 OpenImageIO 的 CMake 配置检测。
+
 访问地址：
 
 ```text

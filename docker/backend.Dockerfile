@@ -11,7 +11,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl git cmake ninja-build build-essential pkg-config \
     libboost-program-options-dev libboost-graph-dev libboost-system-dev \
-    libeigen3-dev libopenimageio-dev libmetis-dev \
+    libeigen3-dev libopenimageio-dev libopenexr-dev libmetis-dev \
     libgoogle-glog-dev libgtest-dev libgmock-dev libsqlite3-dev \
     libglew-dev libcgal-dev libceres-dev libsuitesparse-dev \
     libcurl4-openssl-dev libssl-dev libblas-dev liblapack-dev \
@@ -45,7 +45,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip ffmpeg curl ca-certificates \
     libboost-program-options1.74.0 libboost-graph1.74.0 libboost-system1.74.0 \
-    libopenimageio2.2 libmetis5 libgoogle-glog0v5 libgflags2.2 \
+    libopenimageio2.2 libopenexr25 libmetis5 libgoogle-glog0v5 libgflags2.2 \
     libceres2 libsqlite3-0 libglew2.2 libglu1-mesa \
     libamd2 libcamd2 libccolamd2 libcholmod3 libcolamd2 \
     libcxsparse3 libklu1 libldl2 libmongoose2 libspqr2 libumfpack5 \
