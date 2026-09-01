@@ -36,20 +36,6 @@ RUN git clone --depth 1 --branch "${BRUSH_REF}" \
     https://github.com/ArthurBrussee/brush.git brush
 RUN cargo build --manifest-path /src/brush/Cargo.toml --release -p brush-cli
 
-FROM node:22-bookworm-slim AS front-builder
-
-WORKDIR /app/front
-COPY front/package.json front/package-lock.json ./
-RUN npm ci
-COPY front/app ./app
-COPY front/public ./public
-COPY front/.openai ./.openai
-COPY front/eslint.config.mjs front/next-env.d.ts front/next.config.ts \
-     front/tsconfig.json front/vite.config.ts front/.nvmrc ./
-ARG NEXT_PUBLIC_GAUSSIAN_DEMO=false
-ENV NEXT_PUBLIC_GAUSSIAN_DEMO=${NEXT_PUBLIC_GAUSSIAN_DEMO}
-RUN npm run build
-
 FROM ${CUDA_RUNTIME_IMAGE} AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -75,11 +61,16 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
 COPY --from=builder /usr/local/bin/colmap /usr/local/bin/colmap
 COPY --from=builder /src/brush/target/release/brush-cli /usr/local/bin/brush-cli
 COPY backend /app/backend
-COPY --from=front-builder /app/front /app/front
+COPY front /app/front
 COPY docker/start.sh /usr/local/bin/gaussian-start
 RUN chmod 0755 /usr/local/bin/gaussian-start
 
 RUN python3 -m pip install --no-cache-dir -r /app/backend/requirements.txt
+WORKDIR /app/front
+ARG NEXT_PUBLIC_GAUSSIAN_DEMO=false
+ENV NEXT_PUBLIC_GAUSSIAN_DEMO=${NEXT_PUBLIC_GAUSSIAN_DEMO}
+RUN npm ci && npm run build
+
 WORKDIR /app/backend
 ENV GAUSSIAN_DATA_ROOT=/app/runtime/data \
     GAUSSIAN_HOST=0.0.0.0 \
