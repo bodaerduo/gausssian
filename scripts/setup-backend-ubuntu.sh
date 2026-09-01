@@ -12,6 +12,7 @@ VENV_DIR="${VENV_DIR:-$BACKEND_DIR/.venv}"
 DATA_ROOT="${GAUSSIAN_DATA_ROOT:-$APP_DIR/runtime/data}"
 API_PORT="${GAUSSIAN_PORT:-4178}"
 SERVICE_NAME="${SERVICE_NAME:-gaussian-api}"
+PYTHON_BIN="${PYTHON_BIN:-/usr/bin/python3}"
 
 die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
@@ -22,13 +23,15 @@ if [[ "$(id -u)" != "0" ]]; then
 fi
 [[ -f "$BACKEND_DIR/app.py" ]] || die "后端目录不存在：$BACKEND_DIR"
 [[ -f "$BACKEND_DIR/requirements.txt" ]] || die "requirements.txt 不存在：$BACKEND_DIR"
+[[ -x "$PYTHON_BIN" ]] || PYTHON_BIN="$(command -v python3 || true)"
+[[ -x "$PYTHON_BIN" ]] || die "未找到可用的 Python 3：$PYTHON_BIN"
 
 log "安装 Python 运行时和 API 基础依赖"
 as_root apt-get update
 as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y python3 python3-venv python3-pip ffmpeg
 
 log "创建 Python 虚拟环境"
-python3 -m venv "$VENV_DIR"
+"$PYTHON_BIN" -m venv "$VENV_DIR"
 "$VENV_DIR/bin/python" -m pip install --upgrade pip
 "$VENV_DIR/bin/pip" install -r "$BACKEND_DIR/requirements.txt"
 
