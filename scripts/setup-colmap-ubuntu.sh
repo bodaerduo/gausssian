@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # Install/build a CUDA-enabled, headless COLMAP for the Gaussian worker.
-# Run as a normal user with passwordless-or-interactive sudo access.
+# Prefer a normal user with sudo; root requires ALLOW_ROOT=true.
 # Example:
 #   chmod +x setup-colmap-ubuntu.sh
 #   COLMAP_REF=main ./setup-colmap-ubuntu.sh
@@ -20,6 +20,7 @@ COLMAP_PREFIX="${COLMAP_PREFIX:-/usr/local}"
 CUDA_ARCH="${CUDA_ARCH:-native}"
 BUILD_JOBS="${BUILD_JOBS:-$(nproc)}"
 INSTALL_CUDA="${INSTALL_CUDA:-true}"
+ALLOW_ROOT="${ALLOW_ROOT:-false}"
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"
@@ -30,8 +31,12 @@ die() {
   exit 1
 }
 
-[[ "$(id -u)" != "0" ]] || die "请使用普通部署用户执行，不要直接使用 root。"
-command -v sudo >/dev/null 2>&1 || die "未找到 sudo。"
+if [[ "$(id -u)" == "0" && "$ALLOW_ROOT" != "true" ]]; then
+  die "当前脚本默认禁止 root；如确需 root 执行，请设置 ALLOW_ROOT=true。"
+fi
+if [[ "$(id -u)" != "0" ]]; then
+  command -v sudo >/dev/null 2>&1 || die "未找到 sudo。"
+fi
 
 log "检查 NVIDIA 驱动"
 command -v nvidia-smi >/dev/null 2>&1 || die "未找到 nvidia-smi，请先安装 NVIDIA 驱动。"

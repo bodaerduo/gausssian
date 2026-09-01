@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # gaussian Ubuntu deployment helper.
-# Run this script as the deployment user, not as root.
+# Prefer the deployment user; root requires ALLOW_ROOT=true.
 # Example:
 #   chmod +x scripts/deploy-front-ubuntu.sh
 #   DEMO_MODE=true ./scripts/deploy-front-ubuntu.sh
@@ -18,6 +18,7 @@ API_URL="${API_URL:-}"
 INSTALL_SYSTEM_DEPS="${INSTALL_SYSTEM_DEPS:-true}"
 INSTALL_SERVICE="${INSTALL_SERVICE:-true}"
 SERVICE_NAME="${SERVICE_NAME:-gaussian-web}"
+ALLOW_ROOT="${ALLOW_ROOT:-false}"
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"
@@ -28,8 +29,8 @@ die() {
   exit 1
 }
 
-if [[ "$(id -u)" == "0" ]]; then
-  die "请使用部署用户执行，不要直接使用 root。脚本会通过 sudo 安装系统依赖和 systemd 服务。"
+if [[ "$(id -u)" == "0" && "$ALLOW_ROOT" != "true" ]]; then
+  die "当前脚本默认禁止 root；如确需 root 执行，请设置 ALLOW_ROOT=true。"
 fi
 
 command -v sudo >/dev/null 2>&1 || die "未找到 sudo，请先安装 sudo 或使用有 sudo 权限的部署用户。"

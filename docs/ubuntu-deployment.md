@@ -127,6 +127,15 @@ APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
 ./scripts/deploy-all-ubuntu.sh
 ```
 
+如果当前只能使用 root（例如部署用户没有 sudo 密码），可以显式开启 root 模式：
+
+```bash
+ALLOW_ROOT=true APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
+./scripts/deploy-all-ubuntu.sh
+```
+
+root 模式会让 `gaussian-api` 和 `gaussian-web` systemd 服务以 root 运行，仅建议用于受控服务器；脚本默认仍不允许误用 root。
+
 该脚本依次执行 COLMAP、Brush、后端、前端四个步骤；任一步失败都会停止。
 
 ## 7. Nginx 反向代理

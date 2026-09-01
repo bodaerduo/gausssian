@@ -34,6 +34,15 @@ APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
 ./scripts/deploy-all-ubuntu.sh
 ```
 
+如果必须由 root 部署，使用显式开关：
+
+```bash
+ALLOW_ROOT=true APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
+./scripts/deploy-all-ubuntu.sh
+```
+
+此模式会让 systemd 中的 API/Worker 和前端服务以 root 运行，仅建议用于受控内网或临时部署。
+
 脚本默认按自身位置识别项目根目录，不依赖固定的服务器绝对路径。也可以使用 `APP_DIR=/path/to/gaussian` 指定项目目录。
 
 `engines/colmap/` 和 `engines/brush/` 为可选的本地源码缓存，已加入 Git 忽略；部署服务器没有源码时，安装脚本会从官方仓库自动拉取。

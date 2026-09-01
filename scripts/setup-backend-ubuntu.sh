@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # Create the Python venv and install the Gaussian API/Worker service.
-# Run as the deployment user, not as root.
+# Prefer the deployment user; root requires ALLOW_ROOT=true.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
@@ -12,12 +12,17 @@ VENV_DIR="${VENV_DIR:-$BACKEND_DIR/.venv}"
 DATA_ROOT="${GAUSSIAN_DATA_ROOT:-$APP_DIR/runtime/data}"
 API_PORT="${GAUSSIAN_PORT:-4178}"
 SERVICE_NAME="${SERVICE_NAME:-gaussian-api}"
+ALLOW_ROOT="${ALLOW_ROOT:-false}"
 
 die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
 
-[[ "$(id -u)" != "0" ]] || die "请使用普通部署用户执行。"
-command -v sudo >/dev/null 2>&1 || die "未找到 sudo。"
+if [[ "$(id -u)" == "0" && "$ALLOW_ROOT" != "true" ]]; then
+  die "当前脚本默认禁止 root；如确需 root 执行，请设置 ALLOW_ROOT=true。"
+fi
+if [[ "$(id -u)" != "0" ]]; then
+  command -v sudo >/dev/null 2>&1 || die "未找到 sudo。"
+fi
 [[ -f "$BACKEND_DIR/app.py" ]] || die "后端目录不存在：$BACKEND_DIR"
 [[ -f "$BACKEND_DIR/requirements.txt" ]] || die "requirements.txt 不存在：$BACKEND_DIR"
 

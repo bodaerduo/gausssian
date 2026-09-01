@@ -57,6 +57,15 @@ APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
 ./scripts/deploy-all-ubuntu.sh
 ```
 
+如确实没有可用的部署用户和 sudo 密码，可显式允许 root：
+
+```bash
+ALLOW_ROOT=true APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
+./scripts/deploy-all-ubuntu.sh
+```
+
+这会让 systemd 服务以 root 运行，只应作为受控环境下的例外方案。
+
 所有脚本都默认通过自身位置计算项目根目录；如脚本和项目不在同一目录，可显式传入 `APP_DIR=/path/to/gaussian`。
 
 ## 验收标准

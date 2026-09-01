@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 # Build the headless Brush CLI from the project-local source checkout.
-# Run as the deployment user, not as root.
+# Prefer the deployment user; root requires ALLOW_ROOT=true.
 
 BRUSH_REPO="${BRUSH_REPO:-https://github.com/ArthurBrussee/brush.git}"
 BRUSH_REF="${BRUSH_REF:-main}"
@@ -11,12 +11,17 @@ PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 APP_DIR="${APP_DIR:-$PROJECT_ROOT}"
 BRUSH_SRC_DIR="${BRUSH_SRC_DIR:-$APP_DIR/engines/brush}"
 BRUSH_BIN="${BRUSH_BIN:-/usr/local/bin/brush-cli}"
+ALLOW_ROOT="${ALLOW_ROOT:-false}"
 
 die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
 
-[[ "$(id -u)" != "0" ]] || die "请使用普通部署用户执行。"
-command -v sudo >/dev/null 2>&1 || die "未找到 sudo。"
+if [[ "$(id -u)" == "0" && "$ALLOW_ROOT" != "true" ]]; then
+  die "当前脚本默认禁止 root；如确需 root 执行，请设置 ALLOW_ROOT=true。"
+fi
+if [[ "$(id -u)" != "0" ]]; then
+  command -v sudo >/dev/null 2>&1 || die "未找到 sudo。"
+fi
 [[ -f "$BRUSH_SRC_DIR/Cargo.toml" ]] || die "Brush 源码不存在：$BRUSH_SRC_DIR"
 
 log "安装 Brush 编译和 Vulkan 运行依赖"
