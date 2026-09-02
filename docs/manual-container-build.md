@@ -25,68 +25,10 @@ docker start -ai gaussian-build
 
 ## 2. 在容器内安装依赖和构建
 
-以下命令都在容器内执行。重复执行时，已存在的源码和已安装的软件会复用：
+以下命令都在容器内执行。推荐直接执行项目内的幂等脚本：
 
 ```bash
-set -eux
-
-mkdir -p /app /opt/src
-tar -C /workspace/gaussian \
-  --exclude=.git \
-  --exclude=front/node_modules \
-  --exclude=front/.next \
-  --exclude=front/.vinext \
-  --exclude=front/.wrangler \
-  -cf - . | tar -C /app -xf -
-
-apt-get update
-apt-get install -y --no-install-recommends \
-  ca-certificates curl git cmake ninja-build build-essential pkg-config \
-  python3 python3-pip ffmpeg \
-  libboost-program-options-dev libboost-graph-dev libboost-system-dev \
-  libeigen3-dev libopenimageio-dev libopenexr-dev libmetis-dev \
-  libgoogle-glog-dev libgtest-dev libgmock-dev libsqlite3-dev \
-  libglew-dev libcgal-dev libceres-dev libsuitesparse-dev \
-  libcurl4-openssl-dev libssl-dev libblas-dev liblapack-dev libvulkan-dev
-
-if [ ! -d /opt/src/colmap/.git ]; then
-  git clone --depth 1 --branch main https://github.com/colmap/colmap.git /opt/src/colmap
-fi
-mkdir -p /usr/include/opencv4
-cmake -S /opt/src/colmap -B /opt/src/colmap/build -GNinja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_INSTALL_PREFIX=/usr/local \
-  -DCMAKE_CUDA_ARCHITECTURES=89 \
-  -DCUDA_ENABLED=ON -DGUI_ENABLED=OFF -DTESTS_ENABLED=OFF
-cmake --build /opt/src/colmap/build --target install --parallel "$(nproc)"
-
-if ! command -v cargo >/dev/null 2>&1; then
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
-fi
-source /root/.cargo/env
-if [ ! -d /opt/src/brush/.git ]; then
-  git clone --depth 1 --branch main https://github.com/ArthurBrussee/brush.git /opt/src/brush
-fi
-cargo build --manifest-path /opt/src/brush/Cargo.toml --release -p brush-cli
-install -m 0755 /opt/src/brush/target/release/brush-cli /usr/local/bin/brush-cli
-
-if ! command -v node >/dev/null 2>&1 || [ "$(node -p 'process.versions.node.split(".")[0]')" -lt 22 ]; then
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-  apt-get update && apt-get install -y --no-install-recommends nodejs
-fi
-
-python3 -m pip install --no-cache-dir -r /app/backend/requirements.txt
-cd /app/front
-npm ci
-NEXT_PUBLIC_GAUSSIAN_DEMO=false npm run build
-
-install -m 0755 /app/docker/start.sh /usr/local/bin/gaussian-start
-mkdir -p /app/runtime/data
-
-nvidia-smi
-nvcc --version
-colmap -h >/dev/null
-brush-cli --help >/dev/null
+bash /workspace/gaussian/docker/prepare-manual.sh
 ```
 
 某一步失败时，只重新执行该步骤即可。不要退出并重新创建 `gaussian-build`。
