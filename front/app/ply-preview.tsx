@@ -50,6 +50,8 @@ export function PlyPreview({ modelUrl, modelName, compact = false }: { modelUrl?
       });
       await viewer.addSplatScene(modelUrl, {
         format: SceneFormat.Ply,
+        // Brush exports the COLMAP scene with the opposite vertical axis from the web viewer.
+        rotation: [1, 0, 0, 0],
         showLoadingUI: false,
         progressiveLoad: false,
         splatAlphaRemovalThreshold: 5,
@@ -80,7 +82,7 @@ export function PlyPreview({ modelUrl, modelName, compact = false }: { modelUrl?
           {state === 'error' && <span>{error}</span>}
         </div>
       )}
-      {state === 'ready' && <span className="ply-preview-badge">真实 3DGS · 拖拽旋转</span>}
+      {state === 'ready' && <span className="ply-preview-badge">真实 3DGS · 左键拖拽旋转 · 滚轮缩放</span>}
     </div>
   );
 }
