@@ -538,8 +538,130 @@ h2 { color: #eaf1fc; font-size: 13px; }
 @media (max-width: 960px) {
   .settings-column { gap: 0; }
   .settings-column .settings-panel { height: auto; min-height: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-  .settings-column .progress-panel { padding: 16px 18px 18px; border-top-color: rgba(61, 224, 202, .24); border-top-left-radius: 0; border-top-right-radius: 0; }
+.settings-column .progress-panel { padding: 16px 18px 18px; border-top-color: rgba(61, 224, 202, .24); border-top-left-radius: 0; border-top-right-radius: 0; }
 }
+
+/* Government blue / white industrial software theme. */
+:root {
+  --ink: #102a4a;
+  --ink-soft: #45617e;
+  --ink-faint: #7187a0;
+  --line: #d9e3ef;
+  --line-strong: #b7c9dc;
+  --surface: #ffffff;
+  --surface-solid: #ffffff;
+  --page: #eef4fa;
+  --cyan: #1e66b3;
+  --cyan-dark: #155394;
+  --violet: #2563eb;
+  --amber: #b7791f;
+  --red: #c53d4e;
+}
+
+body { color: var(--ink); font-family: "Fira Sans", Inter, "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif; }
+.app-shell { background: linear-gradient(180deg, #f6f9fd 0, #edf3f9 100%); }
+.app-shell::before { opacity: .48; background-image: linear-gradient(rgba(45, 91, 137, .07) 1px, transparent 1px), linear-gradient(90deg, rgba(45, 91, 137, .07) 1px, transparent 1px); background-size: 48px 48px; mask-image: linear-gradient(to bottom, #fff, transparent 88%); }
+.topbar { height: 72px; border-bottom-color: #d5e0ec; background: rgba(255, 255, 255, .96); backdrop-filter: blur(14px); }
+.brand-mark { border-color: #1e66b3; border-radius: 8px; background: #1e66b3; box-shadow: 0 6px 16px rgba(30, 102, 179, .2); }
+.brand-mark::after { border-color: #fff; background: #2b8bd6; }
+.brand-name { color: #12345b; font-family: "Fira Sans", Inter, sans-serif; }
+.brand-caption { color: #7890aa; }
+.topbar-center { color: #4c6682; }
+.live-dot, .status-pip { background: #198754; box-shadow: 0 0 0 4px rgba(25, 135, 84, .13); }
+.sidebar { border-right-color: #d5e0ec; background: rgba(248, 251, 255, .96); }
+.side-section-label, .eyebrow, .console-head, .worker-card-head { color: #7890aa; }
+.side-link { color: #45617e; }
+.side-link:hover { color: #164c83; background: #e7f0fa; }
+.side-link span { color: #7690aa; }
+.side-link.active { color: #155394; background: #e6f0fa; box-shadow: inset 3px 0 #1e66b3; }
+.side-link.active span { color: #1e66b3; }
+.worker-card { border-color: #c8d9ea; border-radius: 8px; background: #fff; box-shadow: 0 8px 22px rgba(48, 82, 117, .08); }
+.worker-card-head { color: #198754; }
+.worker-name { color: #173b62; }
+.worker-metrics { color: #7187a0; }
+.worker-metrics strong { color: #45617e; }
+.content-pane { padding-top: 42px; }
+.page-kicker { color: #1e66b3; font-weight: 700; }
+.content-heading h1 { color: #102a4a; background: none; -webkit-text-fill-color: initial; }
+.content-heading p { color: #5d7691; }
+.heading-status { color: #45617e; }
+.outline-button { border-color: #a9bfd5; color: #1e568d; background: #fff; }
+.outline-button:hover { color: #124c86; border-color: #1e66b3; background: #edf5fd; }
+.panel { border-color: #cad9e8; border-radius: 8px; background: #fff; box-shadow: 0 8px 24px rgba(48, 82, 117, .07); backdrop-filter: none; }
+.panel-heading { margin-bottom: 18px; }
+.panel-index { color: #1e66b3; }
+h2 { color: #173b62; font-size: 14px; }
+.hint { color: #7187a0; }
+.mode-tabs { border-color: #c9d9e8; border-radius: 6px; background: #f3f7fb; }
+.mode-tab { color: #58718c; }
+.mode-tab.selected { color: #155394; background: #e4effa; box-shadow: inset 0 -2px #1e66b3; }
+.mode-icon { color: #1e66b3; }
+.dropzone { border-color: #92b1ce; border-radius: 8px; background: linear-gradient(145deg, #f9fcff, #edf5fc); }
+.dropzone::after { border-color: rgba(30, 102, 179, .16); border-radius: 6px; }
+.dropzone:hover, .dropzone.dragging { border-color: #1e66b3; box-shadow: 0 0 0 3px rgba(30, 102, 179, .1); }
+.upload-symbol { border-color: #78a8d2; border-radius: 8px; color: #fff; background: #1e66b3; box-shadow: 0 7px 16px rgba(30, 102, 179, .2); }
+.dropzone-label strong { color: #173b62; }
+.dropzone-label span:last-child, .upload-note { color: #7187a0; }
+.upload-note span { color: #b7791f; }
+.setting-row { border-color: #d9e3ef; }
+.setting-row strong { color: #173b62; }
+.setting-row small { color: #7187a0; }
+.select-wrap select { border-color: #a9bfd5; color: #284d72; background: #f8fbfe; }
+.select-wrap select:focus { border-color: #1e66b3; box-shadow: 0 0 0 3px rgba(30, 102, 179, .12); }
+.toggle { background: #b8c8d8; }
+.toggle.on { background: #1e66b3; }
+.action-row { border-color: #cbdbea; background: #f7faff; box-shadow: 0 8px 20px rgba(48, 82, 117, .06); }
+.action-meta { color: #58718c; }
+.start-button { color: #fff; background: #1e66b3; box-shadow: 0 8px 18px rgba(30, 102, 179, .2); }
+.start-button:hover:not(:disabled) { background: #155394; box-shadow: 0 10px 22px rgba(30, 102, 179, .26); transform: translateY(-1px); }
+.job-state { border-color: #b7c9dc; color: #58718c; background: #f2f6fa; }
+.job-state.processing, .job-state.queued { color: #8a5a08; border-color: #e4c27d; background: #fff8e8; }
+.job-state.completed { color: #176b49; border-color: #9bd1b7; background: #ecf8f1; }
+.job-state.failed { color: #a52f3e; border-color: #e8aab2; background: #fff0f2; }
+.stage-row { color: #7187a0; }
+.stage-row.current { color: #173b62; }
+.stage-row.done { color: #176b49; }
+.stage-marker { border-color: #b7c9dc; color: #7187a0; background: #f2f6fa; }
+.stage-marker.done { color: #176b49; border-color: #9bd1b7; background: #ecf8f1; }
+.stage-marker.current { color: #1e66b3; border-color: #8fb5d8; background: #eaf3fb; }
+.stage-loading { color: #8a5a08; }
+.stage-done { color: #176b49; }
+.stage-waiting { color: #7890aa; }
+.console { border-color: #b9cee2; background: #102a4a; color: #c6d9eb; font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, monospace; }
+.console-head { color: #9eb9d2; }
+.console-head span:last-child { color: #86efac; }
+.page-footer { border-color: #cbdbea; color: #7187a0; }
+.gpu-telemetry { border-color: #b9cee2; background: linear-gradient(145deg, #fafdff, #edf5fc); box-shadow: 0 10px 26px rgba(48, 82, 117, .09); }
+.telemetry-state.online { color: #176b49; }
+.telemetry-state.online span { background: #198754; box-shadow: 0 0 0 4px rgba(25, 135, 84, .13); }
+.gpu-telemetry-head strong { color: #173b62; }
+.gpu-telemetry-head span, .gpu-live-number span { color: #7187a0; }
+.gpu-live-number strong { color: #1e66b3; }
+.gpu-sparkline { border-top-color: #d9e8f5; border-bottom-color: #d9e8f5; }
+.gpu-sparkline i { background: linear-gradient(180deg, #2b8bd6, #1e66b3); }
+.gpu-metric-label { color: #58718c; }
+.gpu-metric-label strong { color: #284d72; }
+.gpu-meter { background: #dce9f4; }
+.gpu-meter i { background: #1e66b3; box-shadow: 0 0 8px rgba(30, 102, 179, .25); }
+.gpu-meter.violet i { background: #2b8bd6; box-shadow: 0 0 8px rgba(43, 139, 214, .22); }
+.gpu-foot { color: #7187a0; }
+.gpu-empty { color: #7187a0; }
+.settings-column .progress-panel { border-top-color: #9fc0df; }
+.log-panel { border-color: #b9cee2; }
+
+.ui-icon { display: inline-block; flex: 0 0 auto; vertical-align: middle; }
+.side-link span .ui-icon { width: 16px; height: 16px; }
+.mode-tab, .outline-button, .start-button, .stage-action { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.mode-tab .ui-icon { color: currentColor; }
+.select-wrap > .ui-icon { position: absolute; top: 9px; right: 10px; color: #7187a0; pointer-events: none; }
+.clear-file { width: 40px; height: 40px; display: grid; place-items: center; }
+.clear-file .ui-icon { color: #7187a0; }
+.icon-button { display: grid; place-items: center; color: #4c6682; }
+.icon-button:hover { color: #1e66b3; transform: none; }
+.empty-orb { color: #1e66b3; border-color: #9fc0df; background: #eaf3fb; }
+.card-thumb-placeholder { color: #1e66b3; background: linear-gradient(145deg, #eef6fd, #dcecf9); }
+.card-thumb-placeholder small { color: #58718c; }
+.stage-actions .ui-icon { color: currentColor; }
 
 /* UI Pro Max pass: OLED operations palette with a calm green signal and blue data layer. */
 :root {
