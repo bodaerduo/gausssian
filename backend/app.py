@@ -271,10 +271,19 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
         str(config["steps"]),
         *BRUSH_EXTRA_ARGS,
     ]
-    emit(job_id, phase="Brush Gaussian 训练", progress=72, message=f"开始训练 · {config['steps']} iterations")
-    run_command(job_id, brush_args)
-
     ply = output / "final.ply"
+    emit(job_id, phase="Brush Gaussian 训练", progress=72, message=f"开始训练 · {config['steps']} iterations")
+    try:
+        run_command(job_id, brush_args)
+    except RuntimeError as exc:
+        # Brush may segfault during native teardown after it has already
+        # exported the final model. Keep the artifact only when it passes the
+        # same validation used for normal successful exits.
+        if "退出码 -11" not in str(exc):
+            raise
+        validate_ply(ply)
+        append_log(job_id, f"\nWARNING: Brush exited with -11 after exporting a valid PLY; continuing.\n")
+
     emit(job_id, phase="PLY 质量校验", progress=97, message="正在校验 PLY 输出")
     splat_count = validate_ply(ply)
     emit(
