@@ -1,17 +1,24 @@
 services:
   app:
-    image: gaussian:ready
-    working_dir: /app/backend
+    image: gaussian:deps
+    working_dir: /workspace/gaussian/backend
     command: ["/usr/local/bin/gaussian-start"]
     environment:
+      GAUSSIAN_PROJECT_ROOT: /workspace/gaussian
       GAUSSIAN_DATA_ROOT: /app/runtime/data
       GAUSSIAN_MAX_WORKERS: ${GAUSSIAN_MAX_WORKERS:-1}
+      GAUSSIAN_FRONT_AUTO_BUILD: ${GAUSSIAN_FRONT_AUTO_BUILD:-true}
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
-      - ../:/workspace/gaussian:ro
+      - ../:/workspace/gaussian
       - ../runtime/data:/app/runtime/data
     ports:
       - "${HTTP_PORT:-8080}:4177"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:4178/health >/dev/null && curl -fsS http://127.0.0.1:4177/api/health >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
     runtime: nvidia
     restart: unless-stopped

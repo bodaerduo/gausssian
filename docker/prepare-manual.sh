@@ -4,6 +4,7 @@ set -Eeuo pipefail
 PROJECT_ROOT="${PROJECT_ROOT:-/workspace/gaussian}"
 APP_ROOT="${APP_ROOT:-/app}"
 SRC_ROOT="${SRC_ROOT:-/opt/src}"
+IMAGE_ONLY="${IMAGE_ONLY:-false}"
 
 if [[ "$(id -u)" != "0" ]]; then
   echo "请在 devel 容器内以 root 执行。" >&2
@@ -11,13 +12,15 @@ if [[ "$(id -u)" != "0" ]]; then
 fi
 
 mkdir -p "$APP_ROOT" "$SRC_ROOT"
-tar -C "$PROJECT_ROOT" \
-  --exclude=.git \
-  --exclude=front/node_modules \
-  --exclude=front/.next \
-  --exclude=front/.vinext \
-  --exclude=front/.wrangler \
-  -cf - . | tar -C "$APP_ROOT" -xf -
+if [[ "$IMAGE_ONLY" != "true" ]]; then
+  tar -C "$PROJECT_ROOT" \
+    --exclude=.git \
+    --exclude=front/node_modules \
+    --exclude=front/.next \
+    --exclude=front/.vinext \
+    --exclude=front/.wrangler \
+    -cf - . | tar -C "$APP_ROOT" -xf -
+fi
 
 apt-get update
 apt-get install -y --no-install-recommends \
@@ -58,18 +61,29 @@ if ! command -v node >/dev/null 2>&1 || [[ "$(node -p 'process.versions.node.spl
   apt-get install -y --no-install-recommends nodejs
 fi
 
-python3 -m pip install --no-cache-dir -r "$APP_ROOT/backend/requirements.txt"
-cd "$APP_ROOT/front"
-if [[ ! -d node_modules ]]; then
-  npm ci
+CODE_ROOT="$APP_ROOT"
+if [[ "$IMAGE_ONLY" == "true" ]]; then
+  CODE_ROOT="$PROJECT_ROOT"
 fi
-NEXT_PUBLIC_GAUSSIAN_DEMO=false npm run build
+python3 -m pip install --no-cache-dir -r "$CODE_ROOT/backend/requirements.txt"
+REQUIREMENTS_HASH="$(sha256sum "$CODE_ROOT/backend/requirements.txt" | awk '{print $1}')"
+printf '%s' "$REQUIREMENTS_HASH" > "$CODE_ROOT/backend/.gaussian-requirements-hash"
+if [[ "$IMAGE_ONLY" != "true" ]]; then
+  cd "$APP_ROOT/front"
+  if [[ ! -d node_modules ]]; then
+    npm ci
+  fi
+  NEXT_PUBLIC_GAUSSIAN_DEMO=false npm run build
+fi
 
-install -m 0755 "$APP_ROOT/docker/start.sh" /usr/local/bin/gaussian-start
-mkdir -p "$APP_ROOT/runtime/data"
+install -m 0755 "$PROJECT_ROOT/docker/start.sh" /usr/local/bin/gaussian-start
+mkdir -p "$PROJECT_ROOT/runtime/data"
 
 nvidia-smi
 nvcc --version
 colmap -h >/dev/null
 brush-cli --help >/dev/null
+if [[ "$IMAGE_ONLY" == "true" ]]; then
+  rm -rf "$APP_ROOT" "$SRC_ROOT" /root/.cargo /root/.rustup
+fi
 echo "gaussian 手动构建准备完成。现在可以退出容器并执行 docker commit。"
