@@ -517,7 +517,7 @@ h2 { color: #eaf1fc; font-size: 13px; }
 /* Keep the pipeline attached to the parameter controls instead of making it a distant dashboard card. */
 @media (min-width: 961px) {
   .settings-column { gap: 0; }
-  .settings-column .settings-panel { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .settings-column .settings-panel { height: auto; min-height: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
   .settings-column .progress-panel { flex: 0 0 auto; padding: 16px 18px 18px; overflow: visible; border-top-color: rgba(61, 224, 202, .24); border-top-left-radius: 0; border-top-right-radius: 0; }
 }
 .settings-column .progress-panel .panel-heading { margin-bottom: 12px; }
@@ -534,6 +534,6 @@ h2 { color: #eaf1fc; font-size: 13px; }
 
 @media (max-width: 960px) {
   .settings-column { gap: 0; }
-  .settings-column .settings-panel { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .settings-column .settings-panel { height: auto; min-height: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
   .settings-column .progress-panel { padding: 16px 18px 18px; border-top-color: rgba(61, 224, 202, .24); border-top-left-radius: 0; border-top-right-radius: 0; }
 }
