@@ -909,3 +909,20 @@ body { font-family: "Fira Sans", Inter, "PingFang SC", "Microsoft YaHei", ui-san
 .search-box, .detail-card, .model-card, .empty-orb, .card-thumb-placeholder { border-color: #c7d7e6 !important; background: #ffffff !important; color: #45627f !important; }
 .search-box input, .model-card h3, .detail-card h3, .detail-title { color: #12345b !important; }
 .ui-icon, .icon-button { color: #1769aa !important; }
+.content-pane { padding-top: 32px !important; }
+.roam-hud > div, .roam-loadout, .roam-controls { border-color: rgba(141, 183, 214, .72) !important; background: rgba(247, 251, 254, .94) !important; color: #45627f !important; box-shadow: 0 14px 34px rgba(11, 58, 96, .16) !important; }
+.roam-hud h2, .control-cluster strong { color: #12345b !important; }
+.roam-hud p, .control-cluster small, .control-cluster span, .roam-loadout > div > span, .roam-loadout > span, .roam-loadout > small { color: #7088a1 !important; }
+.roam-close { border-color: #8db7d6 !important; color: #1769aa !important; background: #ffffff !important; }
+.roam-close:hover { border-color: #1769aa !important; color: #0d4f86 !important; }
+.roam-loadout { width: 225px !important; }
+.roam-object-badge { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid #c7d7e6; border-radius: 8px; color: #284d72; background: #ffffff; font-size: 10px; }
+.roam-stick-icon { display: grid; width: 24px; height: 24px; place-items: center; border-radius: 50%; color: #ffffff; background: #1769aa; font-size: 14px; }
+.roam-controls { color: #45627f !important; }
+.control-cluster kbd { border-color: #b8c9da !important; color: #1769aa !important; background: #eef5fb !important; }
+.flight-toggle { color: #284d72 !important; }
+.flight-toggle span { background: #b8c9da !important; }
+.flight-toggle input:checked + span { background: #1769aa !important; }
+.flight-toggle input:checked + span::after { background: #ffffff !important; }
+.speed-control { color: #45627f !important; }
+.speed-control input { accent-color: #1769aa !important; }
