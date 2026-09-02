@@ -53,10 +53,14 @@ export function PlyPreview({ modelUrl, modelName, compact = false }: { modelUrl?
         // Brush exports the COLMAP scene with the opposite vertical axis from the web viewer.
         rotation: [1, 0, 0, 0],
         showLoadingUI: false,
-        progressiveLoad: false,
+        progressiveLoad: true,
         splatAlphaRemovalThreshold: 5,
       });
-      if (cancelled) return;
+      if (cancelled) {
+        await viewer.dispose();
+        viewer = undefined;
+        return;
+      }
       viewer.start();
       setState('ready');
     }).catch((cause: unknown) => {
