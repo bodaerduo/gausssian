@@ -33,7 +33,7 @@ docker run --rm --gpus all \
   nvidia-smi
 ```
 
-最后一条应能看到 RTX 4090。Compose 文件使用兼容旧版 Compose 的 `runtime: nvidia`，不使用新版 `gpus:` 字段。若最后一条失败，需要先配置 NVIDIA Container Toolkit；不要在有业务容器运行时直接重启 Docker。NVIDIA 官方配置方式见 [Container Toolkit 安装指南](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。
+最后一条应能看到 RTX 4090。Compose 文件使用兼容旧版 Compose 的 `runtime: nvidia`，并声明 `compute,utility,graphics` 能力；Brush 的 headless Vulkan 训练仍需要 `graphics`，不需要显示器。若最后一条失败，需要先配置 NVIDIA Container Toolkit；不要在有业务容器运行时直接重启 Docker。NVIDIA 官方配置方式见 [Container Toolkit 安装指南](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)。
 
 ## 构建和启动
 

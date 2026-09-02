@@ -9,7 +9,8 @@ services:
       GAUSSIAN_MAX_WORKERS: ${GAUSSIAN_MAX_WORKERS:-1}
       GAUSSIAN_FRONT_AUTO_BUILD: ${GAUSSIAN_FRONT_AUTO_BUILD:-true}
       NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      # Brush uses headless Vulkan; graphics is required even without a display.
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics
     volumes:
       - ../:/workspace/gaussian
       - ../runtime/data:/app/runtime/data

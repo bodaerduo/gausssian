@@ -14,7 +14,8 @@ services:
       GAUSSIAN_DATA_ROOT: /app/runtime/data
       GAUSSIAN_MAX_WORKERS: ${GAUSSIAN_MAX_WORKERS:-1}
       NVIDIA_VISIBLE_DEVICES: all
-      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      # Brush uses headless Vulkan; graphics is required even without a display.
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics
     volumes:
       - gaussian-data:/app/runtime/data
     ports:
