@@ -16,6 +16,7 @@ cd "$APP_DIR"
 command -v git >/dev/null 2>&1 || die "未找到 git"
 command -v docker >/dev/null 2>&1 || die "未找到 docker"
 command -v curl >/dev/null 2>&1 || die "未找到 curl"
+command -v npm >/dev/null 2>&1 || die "未找到 npm，请先在宿主机安装 Node.js/npm"
 
 log "拉取最新代码"
 git pull --ff-only origin main
@@ -24,18 +25,16 @@ log "停止旧服务"
 docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" down
 
 log "安装前端依赖"
-docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm \
-  -e NPM_REGISTRY="$NPM_REGISTRY" --entrypoint bash app -lc '
-    cd /workspace/gaussian/front
-    npm install --no-audit --no-fund --package-lock=false --registry "$NPM_REGISTRY"
-  '
+(
+  cd "$APP_DIR/front"
+  npm install --no-audit --no-fund --package-lock=false --registry "$NPM_REGISTRY"
+)
 
 log "构建前端"
-docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm \
-  --entrypoint bash app -lc '
-    cd /workspace/gaussian/front
-    npm run build
-  '
+(
+  cd "$APP_DIR/front"
+  npm run build
+)
 
 log "启动服务"
 GAUSSIAN_FRONT_AUTO_BUILD=false \
