@@ -377,6 +377,55 @@ def list_reconstructions() -> dict[str, list[dict[str, Any]]]:
     return {"jobs": jobs}
 
 
+@app.get("/api/v1/reconstructions/{job_id}/colmap")
+def reconstruction_colmap(job_id: str) -> dict[str, Any]:
+    """Return a lightweight, read-only summary of a job's COLMAP artefacts."""
+    if not valid_job_id(job_id):
+        raise HTTPException(status_code=404, detail="任务不存在")
+    state = read_state(job_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    dataset = job_dir(job_id) / "dataset"
+    images = dataset / "images"
+    sparse = dataset / "sparse" / "0"
+    database = dataset / "database.db"
+    image_count = len(image_files(images)) if images.exists() else 0
+    artefacts = []
+    for path in (database, sparse / "cameras.bin", sparse / "images.bin", sparse / "points3D.bin"):
+        if path.exists():
+            artefacts.append({"name": str(path.relative_to(dataset)).replace("\\", "/"), "bytes": path.stat().st_size})
+    return {
+        "id": job_id,
+        "status": state.get("status"),
+        "image_count": image_count or state.get("image_count", 0),
+        "sparse_ready": (sparse / "cameras.bin").exists() and (sparse / "images.bin").exists(),
+        "artefacts": artefacts,
+    }
+
+
+@app.get("/api/v1/system/gpu")
+def gpu_status() -> dict[str, Any]:
+    """Read current NVIDIA GPU metrics when nvidia-smi is available."""
+    query = "name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw"
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", f"--query-gpu={query}", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=3, check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {"available": False, "message": "未检测到 nvidia-smi"}
+    if result.returncode != 0 or not result.stdout.strip():
+        return {"available": False, "message": result.stderr.strip() or "GPU 暂不可用"}
+    devices = []
+    for line in result.stdout.strip().splitlines():
+        fields = [field.strip() for field in line.split(",")]
+        if len(fields) != 6:
+            continue
+        name, utilization, memory_used, memory_total, temperature, power = fields
+        devices.append({"name": name, "utilization": utilization, "memory_used": memory_used, "memory_total": memory_total, "temperature": temperature, "power": power})
+    return {"available": bool(devices), "devices": devices, "timestamp": now()}
+
+
 @app.get("/api/v1/reconstructions/{job_id}")
 def reconstruction_status(job_id: str) -> dict[str, Any]:
     if not valid_job_id(job_id):
