@@ -218,7 +218,7 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
         [COLMAP_BIN, "feature_extractor", "--database_path", str(database), "--image_path", str(images), "--ImageReader.single_camera", "1", "--FeatureExtraction.use_gpu", "1"],
     )
 
-    matcher_name = "sequential_matcher" if source_kind == "video" else MATCHER
+    matcher_name = "sequential" if source_kind == "video" else MATCHER
     if matcher_name not in {"exhaustive", "sequential"}:
         raise RuntimeError("COLMAP_MATCHER 只能是 exhaustive 或 sequential")
     matcher_command = f"{matcher_name}_matcher"
