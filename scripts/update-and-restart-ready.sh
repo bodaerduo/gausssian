@@ -22,8 +22,12 @@ git pull --ff-only origin main
 log "停止旧服务"
 docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" down
 
-if [[ ! -x "$APP_DIR/front/node_modules/.bin/vinext" ]]; then
-  die "缺少 front/node_modules/.bin/vinext；请先完成前端依赖安装，再重新执行本脚本"
+FRONT_LOCK_HASH="$(sha256sum "$APP_DIR/front/package-lock.json" | awk '{print $1}')"
+FRONT_LOCK_FILE="$APP_DIR/front/node_modules/.gaussian-package-lock"
+if [[ ! -x "$APP_DIR/front/node_modules/.bin/vinext" || ! -f "$FRONT_LOCK_FILE" || "$(<"$FRONT_LOCK_FILE")" != "$FRONT_LOCK_HASH" ]]; then
+  log "前端依赖已变化，执行 npm ci"
+  (cd "$APP_DIR/front" && npm ci)
+  printf '%s' "$FRONT_LOCK_HASH" > "$FRONT_LOCK_FILE"
 fi
 
 FRONT_SOURCE_HASH="$(
