@@ -518,7 +518,7 @@ h2 { color: #eaf1fc; font-size: 13px; }
 @media (min-width: 961px) {
   .settings-column { gap: 0; }
   .settings-column .settings-panel { height: auto; min-height: 0; border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
-  .settings-column .progress-panel { flex: 0 0 auto; padding: 16px 18px 18px; overflow: visible; border-top-color: rgba(61, 224, 202, .24); border-top-left-radius: 0; border-top-right-radius: 0; }
+  .settings-column .progress-panel { flex: 1 1 auto; min-height: 0; padding: 16px 18px 18px; overflow: auto; border-top-color: rgba(61, 224, 202, .24); border-top-left-radius: 0; border-top-right-radius: 0; }
 }
 .settings-column .progress-panel .panel-heading { margin-bottom: 12px; }
 .settings-column .progress-numbers, .settings-column .progress-track { display: none; }
