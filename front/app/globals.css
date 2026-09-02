@@ -1019,3 +1019,13 @@ body { font-family: "Fira Sans", Inter, "PingFang SC", "Microsoft YaHei", ui-san
 .detail-stage canvas { aspect-ratio: auto !important; object-fit: contain; }
 .roam-canvas canvas { max-width: 100%; max-height: 100%; }
 @media (max-width: 700px) { .detail-actions { flex-wrap: wrap; } .rename-row { align-items: flex-start; flex-wrap: wrap; } }
+
+/* Keep roam controls compact and translucent so they don't become a second viewport. */
+.roam-cockpit { right: auto !important; bottom: 18px !important; left: 50% !important; width: max-content !important; max-width: calc(100vw - 24px); padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; backdrop-filter: none !important; transform: translateX(-50%); }
+.roam-cockpit .roam-controls { display: flex; align-items: center; gap: 20px; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; backdrop-filter: none !important; }
+.virtual-key, .altitude-button { border-color: rgba(255, 255, 255, .3) !important; color: rgba(255, 255, 255, .9) !important; background: rgba(7, 20, 47, .2) !important; box-shadow: 0 2px 8px rgba(0, 0, 0, .18) !important; backdrop-filter: blur(3px); }
+.virtual-key:hover, .virtual-key:active, .altitude-button:hover, .altitude-button:active, .virtual-key.pressed { border-color: rgba(255, 255, 255, .72) !important; background: rgba(23, 105, 170, .5) !important; }
+.speed-control { display: flex !important; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid rgba(255, 255, 255, .3); border-radius: 8px; color: rgba(255, 255, 255, .9) !important; background: rgba(7, 20, 47, .2) !important; box-shadow: 0 2px 8px rgba(0, 0, 0, .18); backdrop-filter: blur(3px); }
+.speed-control input { width: 82px !important; }
+.speed-control output { min-width: 28px; color: rgba(255, 255, 255, .9); font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; }
+@media (max-width: 700px) { .roam-cockpit { right: auto !important; bottom: 12px !important; left: 50% !important; } .roam-cockpit .roam-controls { gap: 10px; } .speed-control { display: flex !important; } }

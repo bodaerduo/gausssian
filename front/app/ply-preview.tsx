@@ -13,10 +13,15 @@ type GaussianSplatsModule = {
   SceneFormat: { Ply: number };
 };
 
-export function PlyPreview({ modelUrl, modelName, compact = false }: { modelUrl?: string; modelName: string; compact?: boolean }) {
+type PreviewCapture = () => string | undefined;
+
+export function PlyPreview({ modelUrl, modelName, compact = false, onCaptureReady }: { modelUrl?: string; modelName: string; compact?: boolean; onCaptureReady?: (capture: PreviewCapture | undefined) => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const onCaptureReadyRef = useRef(onCaptureReady);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [error, setError] = useState('');
+
+  useEffect(() => { onCaptureReadyRef.current = onCaptureReady; }, [onCaptureReady]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -28,8 +33,10 @@ export function PlyPreview({ modelUrl, modelName, compact = false }: { modelUrl?
 
     let cancelled = false;
     let viewer: GaussianViewer | undefined;
+    let captureFrame = 0;
     setState('loading');
     setError('');
+    onCaptureReadyRef.current?.(undefined);
     container.replaceChildren();
 
     void import('@mkkellogg/gaussian-splats-3d').then(async (module) => {
@@ -63,6 +70,13 @@ export function PlyPreview({ modelUrl, modelName, compact = false }: { modelUrl?
       }
       viewer.start();
       setState('ready');
+      const capture: PreviewCapture = () => {
+        const canvas = container.querySelector('canvas');
+        if (!(canvas instanceof HTMLCanvasElement) || canvas.width === 0 || canvas.height === 0) return undefined;
+        try { return canvas.toDataURL('image/jpeg', 0.82); } catch { return undefined; }
+      };
+      onCaptureReadyRef.current?.(capture);
+      captureFrame = window.requestAnimationFrame(() => { captureFrame = window.requestAnimationFrame(() => { onCaptureReadyRef.current?.(capture); }); });
     }).catch((cause: unknown) => {
       if (!cancelled) {
         setState('error');
@@ -72,6 +86,8 @@ export function PlyPreview({ modelUrl, modelName, compact = false }: { modelUrl?
 
     return () => {
       cancelled = true;
+      window.cancelAnimationFrame(captureFrame);
+      onCaptureReadyRef.current?.(undefined);
       if (viewer) void viewer.dispose();
       container.replaceChildren();
     };
