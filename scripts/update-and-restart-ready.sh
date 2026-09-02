@@ -6,6 +6,7 @@ APP_DIR="${APP_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
 COMPOSE_PROJECT="${COMPOSE_PROJECT:-gaussian-ready}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker/compose-ready.yml}"
 PUBLIC_URL="${PUBLIC_URL:-http://127.0.0.1:8080/}"
+NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org}"
 
 die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
@@ -27,15 +28,15 @@ FRONT_LOCK_FILE="$APP_DIR/front/node_modules/.gaussian-package-lock"
 if [[ ! -x "$APP_DIR/front/node_modules/.bin/vinext" || ! -d "$APP_DIR/front/node_modules/@mkkellogg/gaussian-splats-3d" || ! -d "$APP_DIR/front/node_modules/three" || ! -f "$FRONT_LOCK_FILE" || "$(<"$FRONT_LOCK_FILE")" != "$FRONT_LOCK_HASH" ]]; then
   log "前端依赖已变化，执行 npm ci"
   if ! docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm \
-    --entrypoint bash app -lc '
+    -e NPM_REGISTRY="$NPM_REGISTRY" --entrypoint bash app -lc '
       cd /workspace/gaussian/front
-      npm ci
+      npm ci --registry "$NPM_REGISTRY"
     '; then
     log "npm ci 与当前平台可选依赖锁不一致，回退 npm install"
     docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm \
-      --entrypoint bash app -lc '
+      -e NPM_REGISTRY="$NPM_REGISTRY" --entrypoint bash app -lc '
         cd /workspace/gaussian/front
-        npm install --no-audit --no-fund
+        npm install --no-audit --no-fund --package-lock=false --registry "$NPM_REGISTRY"
       '
   fi
   printf '%s' "$FRONT_LOCK_HASH" > "$FRONT_LOCK_FILE"
