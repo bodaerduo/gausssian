@@ -27,7 +27,7 @@ apt-get install -y --no-install-recommends \
   ca-certificates curl git cmake ninja-build build-essential pkg-config \
   python3 python3-pip ffmpeg \
   libboost-program-options-dev libboost-graph-dev libboost-system-dev \
-  libeigen3-dev libopenimageio-dev libopenexr-dev libmetis-dev \
+  libeigen3-dev libopenimageio-dev openimageio-tools libopenexr-dev libmetis-dev \
   libgoogle-glog-dev libgtest-dev libgmock-dev libsqlite3-dev \
   libglew-dev libcgal-dev libceres-dev libsuitesparse-dev \
   libcurl4-openssl-dev libssl-dev libblas-dev liblapack-dev libvulkan-dev
