@@ -60,3 +60,5 @@ root 执行时 systemd 中的 API/Worker 和前端服务也会以 root 运行。
 ```bash
 docker compose -p gaussian -f docker/compose.yml up -d --build
 ```
+
+如果需要在容器内反复安装依赖、重试构建并封装成长期镜像，使用 [`docs/manual-container-build.md`](./docs/manual-container-build.md)；成功后通过 `docker/compose-ready.yml` 直接启动，不会重新构建。

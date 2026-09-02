@@ -1,0 +1,17 @@
+services:
+  app:
+    image: gaussian:ready
+    working_dir: /app/backend
+    command: ["/usr/local/bin/gaussian-start"]
+    environment:
+      GAUSSIAN_DATA_ROOT: /app/runtime/data
+      GAUSSIAN_MAX_WORKERS: ${GAUSSIAN_MAX_WORKERS:-1}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      - ../:/workspace/gaussian:ro
+      - ../runtime/data:/app/runtime/data
+    ports:
+      - "${HTTP_PORT:-8080}:4177"
+    runtime: nvidia
+    restart: unless-stopped
