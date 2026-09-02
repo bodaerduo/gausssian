@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="${APP_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
 COMPOSE_PROJECT="${COMPOSE_PROJECT:-gaussian-ready}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker/compose-ready.yml}"
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8080/api/health}"
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8080/}"
 
 die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
@@ -26,12 +26,27 @@ if [[ ! -x "$APP_DIR/front/node_modules/.bin/vinext" ]]; then
   die "缺少 front/node_modules/.bin/vinext；请先完成前端依赖安装，再重新执行本脚本"
 fi
 
-log "构建前端"
-docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm \
-  --entrypoint bash app -lc '
-    cd /workspace/gaussian/front
-    npm run build
-  '
+FRONT_SOURCE_HASH="$(
+  {
+    find front/app front/public -type f -print0 | sort -z | xargs -0 sha256sum
+    for file in package.json package-lock.json next.config.ts tsconfig.json vite.config.ts; do
+      [[ -f "front/$file" ]] && sha256sum "front/$file"
+    done
+  } | sha256sum | awk '{print $1}'
+)"
+FRONT_HASH_FILE="$APP_DIR/front/.next/.gaussian-source-hash"
+if [[ ! -f "$FRONT_HASH_FILE" || "$(<"$FRONT_HASH_FILE")" != "$FRONT_SOURCE_HASH" ]]; then
+  log "前端源码已变化，重新构建"
+  docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm \
+    --entrypoint bash app -lc '
+      cd /workspace/gaussian/front
+      npm run build
+    '
+  mkdir -p "$APP_DIR/front/.next"
+  printf '%s' "$FRONT_SOURCE_HASH" > "$FRONT_HASH_FILE"
+else
+  log "前端源码未变化，跳过 npm run build"
+fi
 
 log "启动服务"
 GAUSSIAN_FRONT_AUTO_BUILD=false \
@@ -39,7 +54,9 @@ GAUSSIAN_FRONT_AUTO_BUILD=false \
 
 log "等待服务健康检查"
 for attempt in $(seq 1 30); do
-  if curl -fsS --max-time 5 "$HEALTH_URL"; then
+  if docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" exec -T app sh -c \
+    'curl -fsS http://127.0.0.1:4178/health >/dev/null && curl -fsS http://127.0.0.1:4177/ >/dev/null'; then
+    curl -fsS --max-time 5 "$HEALTH_URL" >/dev/null || true
     printf '\n'
     docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps
     log "服务已就绪：$HEALTH_URL"
