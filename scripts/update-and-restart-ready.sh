@@ -27,11 +27,15 @@ FRONT_LOCK_HASH="$(sha256sum "$APP_DIR/front/package-lock.json" | awk '{print $1
 FRONT_LOCK_FILE="$APP_DIR/front/node_modules/.gaussian-package-lock"
 if [[ ! -x "$APP_DIR/front/node_modules/.bin/vinext" || ! -d "$APP_DIR/front/node_modules/@mkkellogg/gaussian-splats-3d" || ! -d "$APP_DIR/front/node_modules/three" || ! -f "$FRONT_LOCK_FILE" || "$(<"$FRONT_LOCK_FILE")" != "$FRONT_LOCK_HASH" ]]; then
   log "前端依赖已变化，执行 npm ci"
-  if ! docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm \
+  set +e
+  docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm \
     -e NPM_REGISTRY="$NPM_REGISTRY" --entrypoint bash app -lc '
       cd /workspace/gaussian/front
       npm ci --registry "$NPM_REGISTRY"
-    '; then
+    '
+  NPM_CI_STATUS=$?
+  set -e
+  if [[ "$NPM_CI_STATUS" != "0" ]]; then
     log "npm ci 与当前平台可选依赖锁不一致，回退 npm install"
     docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm \
       -e NPM_REGISTRY="$NPM_REGISTRY" --entrypoint bash app -lc '
