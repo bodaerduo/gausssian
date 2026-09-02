@@ -31,7 +31,7 @@ docker start -ai gaussian-build
 bash /workspace/gaussian/docker/prepare-manual.sh
 ```
 
-某一步失败时，只重新执行该步骤即可。不要退出并重新创建 `gaussian-build`。
+某一步失败时，修正原因后可以重复执行同一个脚本；已安装的软件、源码、COLMAP build 目录和前端 `node_modules` 会在 `gaussian-build` 内保留。不要退出并重新创建 `gaussian-build`。
 
 ## 3. 提交为长期镜像
 
