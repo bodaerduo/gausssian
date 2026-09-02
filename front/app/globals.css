@@ -189,6 +189,10 @@ h2 { margin: 0; color: var(--ink); font-size: 13px; font-weight: 760; letter-spa
 .detail-heading h2 { margin-top: 7px; font-size: 18px; letter-spacing: -.03em; }
 .detail-id { color: var(--ink-faint); font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .detail-stage { position: relative; height: min(56vw, 620px); min-height: 460px; overflow: hidden; border: 1px solid #b7cbe4; border-radius: 12px; background: #081632; box-shadow: inset 0 0 42px rgba(69, 145, 255, .18); }
+.stage-actions { position: absolute; z-index: 2; top: 14px; right: 14px; display: flex; gap: 7px; }
+.stage-action { padding: 8px 10px; border: 1px solid rgba(184, 220, 255, .35); border-radius: 7px; color: rgba(226, 239, 255, .9); background: rgba(7, 20, 47, .72); font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; backdrop-filter: blur(8px); transition: border-color .2s, background .2s, transform .2s; }
+.stage-action:hover { border-color: rgba(61, 224, 202, .75); background: rgba(15, 42, 67, .88); transform: translateY(-1px); }
+.detail-stage:fullscreen { width: 100vw; height: 100vh; min-height: 100vh; border: 0; border-radius: 0; }
 .stage-chrome { position: absolute; right: 14px; bottom: 13px; left: 14px; display: flex; justify-content: space-between; color: rgba(217, 233, 255, .7); font: 8px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; pointer-events: none; }
 .stage-corner { position: absolute; color: rgba(180, 220, 255, .82); font: 8px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .stage-corner.top-left { top: 14px; left: 15px; }
