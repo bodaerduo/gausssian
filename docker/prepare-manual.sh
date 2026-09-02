@@ -65,10 +65,14 @@ CODE_ROOT="$APP_ROOT"
 if [[ "$IMAGE_ONLY" == "true" ]]; then
   CODE_ROOT="$PROJECT_ROOT"
 fi
-python3 -m pip install --no-cache-dir -r "$CODE_ROOT/backend/requirements.txt"
 REQUIREMENTS_HASH="$(sha256sum "$CODE_ROOT/backend/requirements.txt" | awk '{print $1}')"
 mkdir -p /var/lib/gaussian
-printf '%s' "$REQUIREMENTS_HASH" > /var/lib/gaussian/requirements.sha256
+if [[ ! -f /var/lib/gaussian/requirements.sha256 || "$(< /var/lib/gaussian/requirements.sha256)" != "$REQUIREMENTS_HASH" ]]; then
+  python3 -m pip install --no-cache-dir -r "$CODE_ROOT/backend/requirements.txt"
+  printf '%s' "$REQUIREMENTS_HASH" > /var/lib/gaussian/requirements.sha256
+else
+  echo "Python requirements 未变化，跳过 pip 安装。"
+fi
 if [[ "$IMAGE_ONLY" != "true" ]]; then
   cd "$APP_ROOT/front"
   if [[ ! -d node_modules ]]; then
