@@ -8,7 +8,10 @@ type GaussianViewer = {
   dispose: () => Promise<void> | void;
 };
 
-type GaussianSplatsModule = { Viewer: new (options?: Record<string, unknown>) => GaussianViewer };
+type GaussianSplatsModule = {
+  Viewer: new (options?: Record<string, unknown>) => GaussianViewer;
+  SceneFormat: { Ply: number };
+};
 
 export function PlyPreview({ modelUrl, modelName, compact = false }: { modelUrl?: string; modelName: string; compact?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -31,7 +34,7 @@ export function PlyPreview({ modelUrl, modelName, compact = false }: { modelUrl?
 
     void import('@mkkellogg/gaussian-splats-3d').then(async (module) => {
       if (cancelled) return;
-      const { Viewer } = module as unknown as GaussianSplatsModule;
+      const { Viewer, SceneFormat } = module as unknown as GaussianSplatsModule;
       viewer = new Viewer({
         rootElement: container,
         cameraUp: [0, 1, 0],
@@ -46,6 +49,7 @@ export function PlyPreview({ modelUrl, modelName, compact = false }: { modelUrl?
         logLevel: 0,
       });
       await viewer.addSplatScene(modelUrl, {
+        format: SceneFormat.Ply,
         showLoadingUI: false,
         progressiveLoad: false,
         splatAlphaRemovalThreshold: 5,
