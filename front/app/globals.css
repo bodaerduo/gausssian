@@ -409,6 +409,47 @@ h2 { color: #eaf1fc; font-size: 13px; }
 .data-progress > span { background: #2c3b50; }
 .empty-inline { color: #74869c; }
 
+/* Mission-control telemetry: keep the live signals compact and readable while the log owns the remaining height. */
+.secondary-column { min-height: 0; }
+.gpu-telemetry { padding: 18px; border-color: #24465a; background: linear-gradient(145deg, rgba(13, 29, 43, .98), rgba(10, 19, 30, .98)); box-shadow: inset 0 1px rgba(61, 224, 202, .08), 0 18px 40px rgba(0, 0, 0, .22); }
+.gpu-telemetry .panel-heading { margin-bottom: 14px; }
+.telemetry-state { display: inline-flex; align-items: center; gap: 6px; color: #6d8198; font: 8px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em; }
+.telemetry-state span { width: 6px; height: 6px; border-radius: 50%; background: #66758a; }
+.telemetry-state.online { color: #65dfcf; }
+.telemetry-state.online span { background: #3de0ca; box-shadow: 0 0 0 4px rgba(61, 224, 202, .12); }
+.gpu-telemetry-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.gpu-telemetry-head strong, .gpu-telemetry-head span { display: block; }
+.gpu-telemetry-head strong { color: #e9f1fc; font-size: 11px; }
+.gpu-telemetry-head span { margin-top: 4px; color: #71859b; font: 8px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.gpu-live-number { text-align: right; }
+.gpu-live-number strong { color: #55efd3; font: 750 24px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: -.08em; }
+.gpu-live-number span { margin-top: 2px; color: #71859b; font-size: 7px; letter-spacing: .14em; }
+.gpu-sparkline { height: 42px; display: flex; align-items: end; gap: 3px; margin: 15px 0 14px; padding: 6px 0; border-top: 1px solid rgba(61, 224, 202, .1); border-bottom: 1px solid rgba(61, 224, 202, .1); }
+.gpu-sparkline i { flex: 1; min-width: 3px; border-radius: 2px 2px 0 0; background: linear-gradient(180deg, #3de0ca, #3471bd); opacity: .9; }
+.gpu-metrics { display: grid; gap: 11px; }
+.gpu-metric-label { display: flex; justify-content: space-between; gap: 8px; color: #8fa3ba; font-size: 9px; }
+.gpu-metric-label strong { color: #d9e6f8; font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.gpu-meter { height: 5px; overflow: hidden; margin-top: 6px; border-radius: 99px; background: #1d3042; }
+.gpu-meter i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #26cdb9, #58f0d3); box-shadow: 0 0 10px rgba(61, 224, 202, .4); }
+.gpu-meter.violet i { background: linear-gradient(90deg, #6d65e8, #ae9cff); box-shadow: 0 0 10px rgba(154, 140, 255, .35); }
+.gpu-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 13px; color: #71859b; font: 8px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.gpu-empty { padding: 14px 0 4px; color: #8295ab; font-size: 10px; }
+.progress-panel { display: flex; flex-direction: column; min-height: 0; }
+.progress-panel .console { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 230px; }
+.console-body { min-height: 170px; overflow: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: #31526a transparent; }
+.console-body > div { padding: 2px 0; }
+.content-heading h1 { background: linear-gradient(105deg, #f1f6ff 15%, #a9fff0 62%, #9a8cff); background-clip: text; -webkit-background-clip: text; color: transparent; }
+.panel { border-color: #213d53; background: linear-gradient(145deg, rgba(16, 29, 43, .96), rgba(9, 17, 27, .97)); }
+
+@media (min-width: 961px) {
+  .secondary-column { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 14px; }
+  .secondary-column .progress-panel { height: auto; }
+}
+
+@media (max-width: 960px) {
+  .progress-panel .console { min-height: 250px; }
+}
+
 @media (max-width: 960px) {
   .content-pane { padding: 34px 28px 20px; }
 }
