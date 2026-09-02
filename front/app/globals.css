@@ -926,3 +926,13 @@ body { font-family: "Fira Sans", Inter, "PingFang SC", "Microsoft YaHei", ui-san
 .flight-toggle input:checked + span::after { background: #ffffff !important; }
 .speed-control { color: #45627f !important; }
 .speed-control input { accent-color: #1769aa !important; }
+.roam-overlay { padding: 0 !important; background: rgba(3, 18, 36, .92) !important; }
+.roam-shell { width: 100vw !important; height: 100vh !important; border: 0 !important; border-radius: 0 !important; }
+.roam-loadout { display: none !important; }
+.roam-cat-hands { position: absolute; z-index: 3; inset: 0; pointer-events: none; overflow: hidden; }
+.roam-cat-hands span { position: absolute; bottom: -34px; width: 132px; height: 96px; border: 2px solid rgba(23, 105, 170, .72); border-radius: 52% 52% 38% 38%; background: linear-gradient(145deg, rgba(224, 238, 248, .96), rgba(148, 190, 220, .96)); box-shadow: 0 -10px 28px rgba(23, 105, 170, .22); }
+.roam-cat-hands span::before, .roam-cat-hands span::after { position: absolute; top: 22px; width: 9px; height: 18px; border: 1px solid rgba(23, 105, 170, .62); border-radius: 50%; background: #f6fbff; content: ''; }
+.roam-cat-hands span::before { left: 30px; }
+.roam-cat-hands span::after { right: 30px; }
+.roam-cat-hands span:first-child { left: -18px; transform: rotate(13deg); }
+.roam-cat-hands span:last-child { right: -18px; transform: rotate(-13deg); }

@@ -16,33 +16,13 @@ type GaussianSplatsModule = {
   SceneFormat: { Ply: number };
 };
 
-function makeStickFigure() {
-  const root = new THREE.Group();
-  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x1769aa, transparent: true, opacity: 0.95 });
-  const accentMaterial = new THREE.MeshBasicMaterial({ color: 0x315fc4 });
-  const addLine = (points: THREE.Vector3[]) => {
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    root.add(new THREE.Line(geometry, lineMaterial));
-  };
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 12), accentMaterial);
-  head.position.y = 1.05;
-  root.add(head);
-  addLine([new THREE.Vector3(0, 0.88, 0), new THREE.Vector3(0, 0.38, 0)]);
-  addLine([new THREE.Vector3(-0.32, 0.68, 0), new THREE.Vector3(0.32, 0.68, 0)]);
-  addLine([new THREE.Vector3(0, 0.38, 0), new THREE.Vector3(-0.24, 0, 0)]);
-  addLine([new THREE.Vector3(0, 0.38, 0), new THREE.Vector3(0.24, 0, 0)]);
-  const marker = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.23, 24), lineMaterial);
-  marker.rotation.x = -Math.PI / 2;
-  marker.position.y = -0.01;
-  root.add(marker);
-  return root;
-}
-
 export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string; modelName: string; onClose: () => void }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const keysRef = useRef(new Set<string>());
   const flyingRef = useRef(true);
   const speedRef = useRef(1);
+  const jumpVelocityRef = useRef(0);
+  const groundedRef = useRef(true);
   const [loaded, setLoaded] = useState(false);
   const [flying, setFlying] = useState(true);
   const [speed, setSpeed] = useState(1);
@@ -57,13 +37,6 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
     let viewer: GaussianViewer | undefined;
     let frame = 0;
     const scene = new THREE.Scene();
-    const avatar = makeStickFigure();
-    avatar.position.set(0, -1.35, 1.25);
-    scene.add(avatar);
-    const grid = new THREE.GridHelper(24, 24, 0x8db7d6, 0xd5e5f0);
-    grid.position.y = -1.36;
-    scene.add(grid);
-
     setLoaded(false);
     setError('');
     mount.replaceChildren();
@@ -110,6 +83,10 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
           const key = event.key.toLowerCase();
           keysRef.current.add(key);
           if (key === 'escape') closeRef.current();
+          if (key === ' ' && groundedRef.current) {
+            jumpVelocityRef.current = 4.4;
+            groundedRef.current = false;
+          }
           if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) event.preventDefault();
         };
         const onKeyUp = (event: KeyboardEvent) => keysRef.current.delete(event.key.toLowerCase());
@@ -117,7 +94,7 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
         const onPointerUp = () => { dragging = false; };
         const onPointerMove = (event: PointerEvent) => {
           if (!dragging) return;
-          yaw -= (event.clientX - lastX) * 0.006;
+          yaw += (event.clientX - lastX) * 0.006;
           pitch = THREE.MathUtils.clamp(pitch - (event.clientY - lastY) * 0.004, -0.85, 0.65);
           lastX = event.clientX;
           lastY = event.clientY;
@@ -129,6 +106,8 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
           previous = now;
           const keys = keysRef.current;
           const move = 2.2 * (keys.has('shift') ? 2.4 : 1) * speedRef.current;
+          if (keys.has('q')) yaw -= 1.8 * dt;
+          if (keys.has('e')) yaw += 1.8 * dt;
           const forward = new THREE.Vector3(Math.sin(yaw), 0, -Math.cos(yaw));
           const right = new THREE.Vector3(Math.cos(yaw), 0, Math.sin(yaw));
           velocity.set(0, 0, 0);
@@ -139,7 +118,14 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
           if (flyingRef.current && (keys.has('r') || keys.has('e'))) velocity.y += move;
           if (flyingRef.current && (keys.has('f') || keys.has('q'))) velocity.y -= move;
           camera.position.addScaledVector(velocity, dt);
-          if (!flyingRef.current) camera.position.y = 1.15;
+          jumpVelocityRef.current -= 11 * dt;
+          camera.position.y += jumpVelocityRef.current * dt;
+          if (camera.position.y <= 1.15) {
+            camera.position.y = 1.15;
+            jumpVelocityRef.current = 0;
+            groundedRef.current = true;
+          }
+          if (!flyingRef.current && groundedRef.current) camera.position.y = 1.15;
           const lookDirection = new THREE.Vector3(Math.sin(yaw), Math.sin(pitch), -Math.cos(yaw));
           camera.lookAt(camera.position.clone().add(lookDirection.multiplyScalar(3)));
           viewer.forceRenderNextFrame?.();
@@ -184,5 +170,5 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
     };
   }, [modelUrl]);
 
-  return <div className="roam-overlay" role="dialog" aria-modal="true" aria-label={`${modelName} 漫游模式`}><div className="roam-shell"><div className="roam-canvas" ref={mountRef}><div className="roam-crosshair" /><div className="roam-status"><span className={loaded ? 'status-pip' : 'status-pip amber'} />{error ? error : loaded ? '真实 PLY 场景已载入' : '正在加载真实 Gaussian 场景…'}</div></div><div className="roam-hud"><div><span className="eyebrow">REAL PLY / FREE ROAM</span><h2>{modelName}</h2><p>漫游的是当前资产本身，火柴人仅作为位置标记。</p></div><button className="roam-close" type="button" onClick={onClose}>× 退出漫游</button></div><div className="roam-loadout"><span>漫游对象</span><div className="roam-object-badge"><span className="roam-stick-icon">✣</span><strong>真实 Gaussian PLY</strong></div><small>WASD 移动 · 拖动鼠标转向 · R/F 升降</small></div><div className="roam-controls"><div className="control-cluster"><strong>移动</strong><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><small>前后左右</small></div><div className="control-cluster"><strong>视角</strong><span>拖动鼠标</span><small>旋转镜头</small></div><label className="flight-toggle"><input type="checkbox" checked={flying} onChange={(event) => { const next = event.target.checked; flyingRef.current = next; setFlying(next); }} /><span />飞行模式</label><label className="speed-control">速度 <input type="range" min="0.6" max="2" step="0.1" value={speed} onChange={(event) => { const next = Number(event.target.value); speedRef.current = next; setSpeed(next); }} /></label></div></div></div>;
+  return <div className="roam-overlay" role="dialog" aria-modal="true" aria-label={`${modelName} 漫游模式`}><div className="roam-shell"><div className="roam-canvas" ref={mountRef}><div className="roam-crosshair" /><div className="roam-cat-hands" aria-hidden="true"><span /><span /></div><div className="roam-status"><span className={loaded ? 'status-pip' : 'status-pip amber'} />{error ? error : loaded ? '真实 PLY 场景已载入' : '正在加载真实 Gaussian 场景…'}</div></div><div className="roam-hud"><div><span className="eyebrow">TOM CAT / FIRST PERSON</span><h2>{modelName}</h2><p>第一视角漫游当前真实 Gaussian PLY 场景。</p></div><button className="roam-close" type="button" onClick={onClose}>× 退出漫游</button></div><div className="roam-controls"><div className="control-cluster"><strong>移动</strong><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><small>前后左右</small></div><div className="control-cluster"><strong>转向</strong><span><kbd>Q</kbd><kbd>E</kbd></span><small>左转 / 右转</small></div><div className="control-cluster"><strong>动作</strong><span><kbd>SPACE</kbd></span><small>跳跃</small></div><div className="control-cluster"><strong>视角</strong><span>拖动鼠标</span><small>左拖左看 · 右拖右看</small></div><label className="flight-toggle"><input type="checkbox" checked={flying} onChange={(event) => { const next = event.target.checked; flyingRef.current = next; setFlying(next); }} /><span />飞行模式</label><label className="speed-control">速度 <input type="range" min="0.6" max="2" step="0.1" value={speed} onChange={(event) => { const next = Number(event.target.value); speedRef.current = next; setSpeed(next); }} /></label></div></div></div>;
 }
