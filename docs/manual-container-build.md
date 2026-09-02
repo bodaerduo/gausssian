@@ -37,6 +37,12 @@ bash /workspace/gaussian/docker/prepare-manual.sh
 IMAGE_ONLY=true bash /workspace/gaussian/docker/prepare-manual.sh
 ```
 
+准备或排查过程中，可执行只读环境检查：
+
+```bash
+bash /workspace/gaussian/docker/check-environment.sh
+```
+
 某一步失败时，修正原因后可以重复执行同一个脚本；已安装的软件、源码和 COLMAP build 目录会在 `gaussian-build` 内保留。不要退出并重新创建 `gaussian-build`。
 
 ## 3. 提交为长期镜像

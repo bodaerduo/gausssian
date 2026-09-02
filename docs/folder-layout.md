@@ -28,6 +28,7 @@ gaussian/
 │   ├── backend.Dockerfile
 │   ├── compose.yml
 │   ├── compose-ready.yml
+│   ├── check-environment.sh
 │   ├── prepare-manual.sh
 │   └── start.sh
 ├── AGENTS.md              # 协作约束、验收标准和流程
