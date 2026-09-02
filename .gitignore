@@ -6,7 +6,6 @@
 /front/out/
 /backend/.venv/
 /backend/__pycache__/
-/backend/.gaussian-requirements-hash
 /front/node_modules/.gaussian-package-lock
 /front/.next/.gaussian-source-hash
 /backend/_smoke_data/

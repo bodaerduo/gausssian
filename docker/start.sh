@@ -33,10 +33,12 @@ fi
 
 cd "$PROJECT_ROOT/backend"
 if [[ "${GAUSSIAN_AUTO_INSTALL_PYTHON_DEPS:-true}" == "true" ]]; then
+  REQUIREMENTS_MARKER="${GAUSSIAN_REQUIREMENTS_MARKER:-/var/lib/gaussian/requirements.sha256}"
+  mkdir -p "$(dirname "$REQUIREMENTS_MARKER")"
   REQUIREMENTS_HASH="$(sha256sum requirements.txt | awk '{print $1}')"
-  if [[ ! -f .gaussian-requirements-hash || "$(<.gaussian-requirements-hash)" != "$REQUIREMENTS_HASH" ]]; then
+  if [[ ! -f "$REQUIREMENTS_MARKER" || "$(<"$REQUIREMENTS_MARKER")" != "$REQUIREMENTS_HASH" ]]; then
     python3 -m pip install --no-cache-dir -r requirements.txt
-    printf '%s' "$REQUIREMENTS_HASH" > .gaussian-requirements-hash
+    printf '%s' "$REQUIREMENTS_HASH" > "$REQUIREMENTS_MARKER"
   fi
 fi
 python3 -m uvicorn app:app --host 0.0.0.0 --port 4178 &
