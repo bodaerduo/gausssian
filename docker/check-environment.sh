@@ -78,8 +78,13 @@ section "项目挂载与数据目录"
 if [[ -d "$PROJECT_ROOT/backend" && -f "$PROJECT_ROOT/backend/app.py" ]]; then pass "后端代码：$PROJECT_ROOT/backend"; else fail "后端代码不存在：$PROJECT_ROOT/backend"; fi
 if [[ -d "$PROJECT_ROOT/front" && -f "$PROJECT_ROOT/front/package.json" ]]; then pass "前端代码：$PROJECT_ROOT/front"; else fail "前端代码不存在：$PROJECT_ROOT/front"; fi
 if [[ -w "$PROJECT_ROOT" ]]; then pass "项目挂载目录可写"; else warn "项目挂载目录不可写，前端无法保存 node_modules/.next"; fi
-mkdir -p "$DATA_ROOT" 2>/dev/null || true
-if [[ -w "$DATA_ROOT" ]]; then pass "数据目录可写：$DATA_ROOT"; else fail "数据目录不可写：$DATA_ROOT"; fi
+if [[ -d "$DATA_ROOT" && -w "$DATA_ROOT" ]]; then
+  pass "数据目录可写：$DATA_ROOT"
+elif [[ -e "$DATA_ROOT" ]]; then
+  fail "数据目录不可写：$DATA_ROOT"
+else
+  warn "数据目录尚不存在：$DATA_ROOT；Compose 启动时应创建"
+fi
 
 if [[ -d "$PROJECT_ROOT/front/node_modules" ]]; then pass "前端 node_modules 已存在"; else warn "前端 node_modules 尚未安装，首次启动会执行 npm ci"; fi
 if [[ -d "$PROJECT_ROOT/front/.next" ]]; then pass "前端构建目录 .next 已存在"; else warn "前端尚未构建，首次启动会执行 npm run build"; fi
