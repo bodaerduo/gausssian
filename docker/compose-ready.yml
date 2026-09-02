@@ -2,7 +2,7 @@ services:
   app:
     image: gaussian:deps
     working_dir: /workspace/gaussian/backend
-    command: ["/usr/local/bin/gaussian-start"]
+    command: ["bash", "/workspace/gaussian/docker/start.sh"]
     environment:
       GAUSSIAN_PROJECT_ROOT: /workspace/gaussian
       GAUSSIAN_DATA_ROOT: /app/runtime/data
