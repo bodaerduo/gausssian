@@ -9,6 +9,7 @@
 - `engines/colmap/`：官方 COLMAP 源码。
 - `engines/brush/`：官方 Brush 源码。
 - `docs/`：架构、流程、Ubuntu 部署和方案文档。
+- [`docs/开源视频三维重建与动态高斯方案调研.md`](./docs/开源视频三维重建与动态高斯方案调研.md)：流式重建、动态 Gaussian 与当前 COLMAP + Brush 的选型对比。
 - `scripts/`：前端、后端、COLMAP、Brush 的部署脚本。
 - `docker/`：基于 CUDA runtime 的单镜像 GPU 容器定义。
 
