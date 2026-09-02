@@ -67,7 +67,7 @@ APP_DIR="$APP_DIR" ./scripts/setup-brush-ubuntu.sh
 
 ## 4. 部署后端 API/Worker
 
-脚本会创建 `backend/.venv`，安装 Python 依赖，并注册 `gaussian-api` systemd 服务。任务数据默认放到项目内的 `runtime/data`，生产环境建议通过 `GAUSSIAN_DATA_ROOT` 指向独立数据盘。
+脚本会创建 `backend/.venv`，安装 Python 依赖，并注册 `gaussian-api` systemd 服务。任务数据默认放到项目内的 `runtime/data`，生产环境建议通过 `GAUSSIAN_DATA_ROOT` 指向独立数据盘。Worker 日志保存在 `${GAUSSIAN_DATA_ROOT}/logs/YYYY-MM-DD.log`（按服务器本地日期每天一个文件），单个任务的完整输出仍保存在 `${GAUSSIAN_DATA_ROOT}/jobs/<task_id>/worker.log`。
 
 ```bash
 GAUSSIAN_DATA_ROOT=/var/lib/gaussian/data \

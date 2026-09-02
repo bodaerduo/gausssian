@@ -52,6 +52,7 @@ MAX_WORKERS = env_int("GAUSSIAN_MAX_WORKERS", 1)
 MATCHER = os.getenv("COLMAP_MATCHER", "exhaustive")
 
 STATE_LOCK = threading.RLock()
+LOG_LOCK = threading.RLock()
 JOB_LOCKS: dict[str, threading.RLock] = {}
 EXECUTOR = ThreadPoolExecutor(max_workers=MAX_WORKERS, thread_name_prefix="gaussian-worker")
 
@@ -62,6 +63,12 @@ def now() -> str:
 
 def job_dir(job_id: str) -> Path:
     return DATA_ROOT / "jobs" / job_id
+
+
+def daily_log_path() -> Path:
+    """Return the log file for the server's current calendar day."""
+    day = datetime.now().astimezone().date().isoformat()
+    return DATA_ROOT / "logs" / f"{day}.log"
 
 
 def valid_job_id(job_id: str) -> bool:
@@ -110,8 +117,21 @@ def emit(job_id: str, *, event_type: str = "progress", phase: str, progress: int
 
 
 def append_log(job_id: str, text: str) -> None:
-    with (job_dir(job_id) / "worker.log").open("a", encoding="utf-8") as stream:
-        stream.write(text)
+    # Keep the per-job log for detailed troubleshooting and also append to a
+    # date-rotated application log so operators have one predictable place to
+    # inspect all worker activity. Both files live below GAUSSIAN_DATA_ROOT.
+    timestamp = now()
+    with LOG_LOCK:
+        worker_path = job_dir(job_id) / "worker.log"
+        worker_path.parent.mkdir(parents=True, exist_ok=True)
+        with worker_path.open("a", encoding="utf-8") as stream:
+            stream.write(text)
+
+        daily_path = daily_log_path()
+        daily_path.parent.mkdir(parents=True, exist_ok=True)
+        with daily_path.open("a", encoding="utf-8") as stream:
+            for line in text.splitlines() or [""]:
+                stream.write(f"[{timestamp}] [{job_id}] {line}\n")
 
 
 def run_command(job_id: str, command: list[str], *, timeout: int = 0) -> None:
@@ -141,7 +161,10 @@ def run_command(job_id: str, command: list[str], *, timeout: int = 0) -> None:
             raise RuntimeError(f"命令超时：{command[0]}")
     return_code = process.wait()
     if return_code != 0:
-        raise RuntimeError(f"命令失败（退出码 {return_code}）：{command[0]}，详见 worker.log")
+        raise RuntimeError(
+            f"命令失败（退出码 {return_code}）：{command[0]}，详见任务 worker.log 或 "
+            "GAUSSIAN_DATA_ROOT/logs/YYYY-MM-DD.log"
+        )
 
 
 def safe_filename(filename: str | None, fallback: str) -> str:
@@ -234,8 +257,6 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
     brush_args = [
         BRUSH_BIN,
         str(dataset),
-        "--with-viewer",
-        "false",
         "--total-train-iters",
         str(config["steps"]),
         "--max-resolution",
@@ -280,6 +301,7 @@ def worker_entry(job_id: str, source_kind: str, source_path: Path, quality_name:
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     DATA_ROOT.joinpath("jobs").mkdir(parents=True, exist_ok=True)
+    DATA_ROOT.joinpath("logs").mkdir(parents=True, exist_ok=True)
     yield
     EXECUTOR.shutdown(wait=False, cancel_futures=False)
 

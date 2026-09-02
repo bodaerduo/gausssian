@@ -101,7 +101,7 @@ fi
 section "本地健康检查"
 if command -v curl >/dev/null 2>&1; then
   if curl -fsS --max-time 5 http://127.0.0.1:4178/health >/dev/null 2>&1; then pass "FastAPI 4178 健康检查通过"; else warn "FastAPI 4178 尚未启动"; fi
-  if curl -fsS --max-time 5 http://127.0.0.1:4177/api/health >/dev/null 2>&1; then pass "前端同源 API 4177 健康检查通过"; else warn "前端 4177 尚未启动"; fi
+  if curl -fsS --max-time 5 http://127.0.0.1:4177/ >/dev/null 2>&1; then pass "前端 4177 页面健康检查通过"; else warn "前端 4177 尚未启动"; fi
 fi
 
 section "结果"

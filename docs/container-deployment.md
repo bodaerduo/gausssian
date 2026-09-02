@@ -58,7 +58,8 @@ http://服务器地址:8080/
 API 健康检查：
 
 ```bash
-curl -f http://127.0.0.1:8080/api/health
+docker compose -p gaussian -f docker/compose.yml exec -T backend \
+  curl -f http://127.0.0.1:4178/health
 docker compose -p gaussian -f docker/compose.yml ps
 docker compose -p gaussian -f docker/compose.yml logs -f backend
 ```

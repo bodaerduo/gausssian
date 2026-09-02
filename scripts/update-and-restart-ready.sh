@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="${APP_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
 COMPOSE_PROJECT="${COMPOSE_PROJECT:-gaussian-ready}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker/compose-ready.yml}"
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8080/}"
+PUBLIC_URL="${PUBLIC_URL:-http://127.0.0.1:8080/}"
 
 die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
 log() { printf '\n[%s] %s\n' "$(date '+%F %T')" "$*"; }
@@ -55,11 +55,11 @@ GAUSSIAN_FRONT_AUTO_BUILD=false \
 log "等待服务健康检查"
 for attempt in $(seq 1 30); do
   if docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" exec -T app sh -c \
-    'curl -fsS http://127.0.0.1:4178/health >/dev/null && curl -fsS http://127.0.0.1:4177/ >/dev/null'; then
-    curl -fsS --max-time 5 "$HEALTH_URL" >/dev/null || true
+    'curl -fsS --max-time 5 http://127.0.0.1:4178/health >/dev/null && curl -fsS --max-time 5 http://127.0.0.1:4177/ >/dev/null' \
+    && curl -fsS --max-time 5 "$PUBLIC_URL" >/dev/null; then
     printf '\n'
     docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps
-    log "服务已就绪：$HEALTH_URL"
+    log "服务已就绪：API=http://127.0.0.1:4178/health，网页=$PUBLIC_URL"
     exit 0
   fi
   sleep 2
@@ -67,4 +67,4 @@ done
 
 docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps
 docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" logs --tail=100 app
-die "服务未在规定时间内通过健康检查：$HEALTH_URL"
+die "服务未在规定时间内通过健康检查：API=http://127.0.0.1:4178/health，网页=$PUBLIC_URL"

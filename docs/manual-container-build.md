@@ -73,7 +73,8 @@ docker compose -p gaussian-ready -f docker/compose-ready.yml up -d
 ```bash
 docker compose -p gaussian-ready -f docker/compose-ready.yml ps
 docker compose -p gaussian-ready -f docker/compose-ready.yml logs -f app
-curl http://127.0.0.1:8080/api/health
+docker compose -p gaussian-ready -f docker/compose-ready.yml exec -T app \
+  curl -f http://127.0.0.1:4178/health
 ```
 
 访问：`http://服务器地址:8080/`。
