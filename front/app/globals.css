@@ -513,3 +513,27 @@ h2 { color: #eaf1fc; font-size: 13px; }
   .signals-column .gpu-telemetry { min-height: 230px; }
   .log-panel { min-height: 320px; }
 }
+
+/* Keep the pipeline attached to the parameter controls instead of making it a distant dashboard card. */
+@media (min-width: 961px) {
+  .settings-column { gap: 0; }
+  .settings-column .settings-panel { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .settings-column .progress-panel { flex: 0 0 auto; padding: 16px 18px 18px; overflow: visible; border-top-color: rgba(61, 224, 202, .24); border-top-left-radius: 0; border-top-right-radius: 0; }
+}
+.settings-column .progress-panel .panel-heading { margin-bottom: 12px; }
+.settings-column .progress-numbers, .settings-column .progress-track { display: none; }
+.settings-column .stage-list { display: grid; gap: 6px; margin: 0; }
+.settings-column .stage-row { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 8px; min-height: 24px; font-size: 9px; }
+.settings-column .stage-row.done { color: #92d9d0; }
+.settings-column .stage-marker { width: 20px; height: 20px; border-radius: 6px; }
+.settings-column .stage-marker:not(.done):not(.current) { color: #62758e; border-color: #2e4057; background: #132031; }
+.settings-column .stage-loading, .settings-column .stage-done, .settings-column .stage-waiting { margin-left: 0; font: 8px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+.settings-column .stage-loading { color: var(--amber); }
+.settings-column .stage-done { color: #61dfcf; }
+.settings-column .stage-waiting { color: #62758e; }
+
+@media (max-width: 960px) {
+  .settings-column { gap: 0; }
+  .settings-column .settings-panel { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+  .settings-column .progress-panel { padding: 16px 18px 18px; border-top-color: rgba(61, 224, 202, .24); border-top-left-radius: 0; border-top-right-radius: 0; }
+}
