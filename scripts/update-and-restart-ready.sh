@@ -23,50 +23,19 @@ git pull --ff-only origin main
 log "停止旧服务"
 docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" down
 
-FRONT_LOCK_HASH="$(sha256sum "$APP_DIR/front/package-lock.json" | awk '{print $1}')"
-FRONT_LOCK_FILE="$APP_DIR/front/node_modules/.gaussian-package-lock"
-if [[ ! -x "$APP_DIR/front/node_modules/.bin/vinext" || ! -d "$APP_DIR/front/node_modules/@mkkellogg/gaussian-splats-3d" || ! -d "$APP_DIR/front/node_modules/three" || ! -f "$FRONT_LOCK_FILE" || "$(<"$FRONT_LOCK_FILE")" != "$FRONT_LOCK_HASH" ]]; then
-  log "前端依赖已变化，执行 npm ci"
-  set +e
-  docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm \
-    -e NPM_REGISTRY="$NPM_REGISTRY" --entrypoint bash app -lc '
-      cd /workspace/gaussian/front
-      npm ci --registry "$NPM_REGISTRY"
-    '
-  NPM_CI_STATUS=$?
-  set -e
-  if [[ "$NPM_CI_STATUS" != "0" ]]; then
-    log "npm ci 与当前平台可选依赖锁不一致，回退 npm install"
-    docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm \
-      -e NPM_REGISTRY="$NPM_REGISTRY" --entrypoint bash app -lc '
-        cd /workspace/gaussian/front
-        npm install --no-audit --no-fund --package-lock=false --registry "$NPM_REGISTRY"
-      '
-  fi
-  printf '%s' "$FRONT_LOCK_HASH" > "$FRONT_LOCK_FILE"
-fi
+log "安装前端依赖"
+docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm \
+  -e NPM_REGISTRY="$NPM_REGISTRY" --entrypoint bash app -lc '
+    cd /workspace/gaussian/front
+    npm install --no-audit --no-fund --package-lock=false --registry "$NPM_REGISTRY"
+  '
 
-FRONT_SOURCE_HASH="$(
-  {
-    find front/app front/public -type f -print0 | sort -z | xargs -0 sha256sum
-    for file in package.json package-lock.json next.config.ts tsconfig.json vite.config.ts; do
-      [[ -f "front/$file" ]] && sha256sum "front/$file"
-    done
-  } | sha256sum | awk '{print $1}'
-)"
-FRONT_HASH_FILE="$APP_DIR/front/.next/.gaussian-source-hash"
-if [[ ! -f "$FRONT_HASH_FILE" || "$(<"$FRONT_HASH_FILE")" != "$FRONT_SOURCE_HASH" ]]; then
-  log "前端源码已变化，重新构建"
-  docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm \
-    --entrypoint bash app -lc '
-      cd /workspace/gaussian/front
-      npm run build
-    '
-  mkdir -p "$APP_DIR/front/.next"
-  printf '%s' "$FRONT_SOURCE_HASH" > "$FRONT_HASH_FILE"
-else
-  log "前端源码未变化，跳过 npm run build"
-fi
+log "构建前端"
+docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" run --rm \
+  --entrypoint bash app -lc '
+    cd /workspace/gaussian/front
+    npm run build
+  '
 
 log "启动服务"
 GAUSSIAN_FRONT_AUTO_BUILD=false \
