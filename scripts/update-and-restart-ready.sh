@@ -24,7 +24,7 @@ docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" down
 
 FRONT_LOCK_HASH="$(sha256sum "$APP_DIR/front/package-lock.json" | awk '{print $1}')"
 FRONT_LOCK_FILE="$APP_DIR/front/node_modules/.gaussian-package-lock"
-if [[ ! -x "$APP_DIR/front/node_modules/.bin/vinext" || ! -f "$FRONT_LOCK_FILE" || "$(<"$FRONT_LOCK_FILE")" != "$FRONT_LOCK_HASH" ]]; then
+if [[ ! -x "$APP_DIR/front/node_modules/.bin/vinext" || ! -d "$APP_DIR/front/node_modules/@mkkellogg/gaussian-splats-3d" || ! -d "$APP_DIR/front/node_modules/three" || ! -f "$FRONT_LOCK_FILE" || "$(<"$FRONT_LOCK_FILE")" != "$FRONT_LOCK_HASH" ]]; then
   log "前端依赖已变化，执行 npm ci"
   (cd "$APP_DIR/front" && npm ci)
   printf '%s' "$FRONT_LOCK_HASH" > "$FRONT_LOCK_FILE"
