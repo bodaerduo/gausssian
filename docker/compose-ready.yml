@@ -14,6 +14,7 @@ services:
       # Do not let Brush silently select its CPU backend when a discrete GPU is available.
       CUBECL_WGPU_DEFAULT_DEVICE: "${CUBECL_WGPU_DEFAULT_DEVICE:-DiscreteGpu(0)}"
     volumes:
+      - ../runtime/colmap-cuda:/usr/local/bin/colmap:ro
       - ../:/workspace/gaussian
       - ../runtime/data:/app/runtime/data
     ports:

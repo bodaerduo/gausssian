@@ -12,10 +12,13 @@ set -Eeuo pipefail
 
 COLMAP_REPO="${COLMAP_REPO:-https://github.com/colmap/colmap.git}"
 COLMAP_REF="${COLMAP_REF:-main}"
+CERES_REF="${CERES_REF:-2.2.0}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 APP_DIR="${APP_DIR:-$PROJECT_ROOT}"
 COLMAP_SRC_DIR="${COLMAP_SRC_DIR:-$APP_DIR/engines/colmap}"
+CERES_SRC_DIR="${CERES_SRC_DIR:-$APP_DIR/engines/ceres}"
+CERES_PREFIX="${CERES_PREFIX:-/opt/ceres-cuda}"
 COLMAP_PREFIX="${COLMAP_PREFIX:-/usr/local}"
 CUDA_ARCH="${CUDA_ARCH:-native}"
 BUILD_JOBS="${BUILD_JOBS:-$(nproc)}"
@@ -48,7 +51,7 @@ as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y \
   libeigen3-dev libopenimageio-dev openimageio-tools libmetis-dev \
   libgoogle-glog-dev libgtest-dev libgmock-dev libsqlite3-dev \
   libglew-dev \
-  libcgal-dev libceres-dev libsuitesparse-dev \
+  libcgal-dev libsuitesparse-dev libgflags-dev libabsl-dev \
   libcurl4-openssl-dev libssl-dev libmkl-full-dev
 
 # COLMAP's Ubuntu installation guide documents this workaround for the
@@ -97,6 +100,43 @@ else
   fi
 fi
 
+log "准备 Ceres 源码：$CERES_REF"
+as_root mkdir -p "$(dirname "$CERES_SRC_DIR")"
+as_root chown -R "$(id -un):$(id -gn)" "$(dirname "$CERES_SRC_DIR")"
+if [[ -d "$CERES_SRC_DIR/.git" ]]; then
+  if [[ -n "$(git -C "$CERES_SRC_DIR" status --porcelain)" ]]; then
+    die "Ceres 源码目录有未提交修改，请先处理：$CERES_SRC_DIR"
+  fi
+  git -C "$CERES_SRC_DIR" fetch --tags origin
+  git -C "$CERES_SRC_DIR" checkout "$CERES_REF"
+  git -C "$CERES_SRC_DIR" pull --ff-only origin "$CERES_REF" 2>/dev/null || true
+else
+  if [[ -e "$CERES_SRC_DIR" ]]; then
+    [[ -f "$CERES_SRC_DIR/CMakeLists.txt" ]] || die "已有 Ceres 路径不是完整源码：$CERES_SRC_DIR"
+    log "使用项目内已有 Ceres 源码（无 Git 元数据，不执行更新）"
+  else
+    git clone https://github.com/ceres-solver/ceres-solver.git "$CERES_SRC_DIR"
+    git -C "$CERES_SRC_DIR" checkout "$CERES_REF"
+  fi
+fi
+
+CERES_BUILD_DIR="$CERES_SRC_DIR/build"
+mkdir -p "$CERES_BUILD_DIR"
+cd "$CERES_BUILD_DIR"
+log "配置带 CUDA 的 Ceres"
+cmake .. -GNinja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX="$CERES_PREFIX" \
+  -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCH" \
+  -DUSE_CUDA=ON \
+  -DBUILD_SHARED_LIBS=OFF \
+  -DBUILD_TESTING=OFF \
+  -DBUILD_EXAMPLES=OFF \
+  -DBUILD_DOCUMENTATION=OFF
+log "编译 Ceres（并行数：$BUILD_JOBS）"
+ninja -j "$BUILD_JOBS"
+as_root ninja install
+
 BUILD_DIR="$COLMAP_SRC_DIR/build"
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
@@ -115,6 +155,7 @@ fi
 cmake .. -GNinja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX="$COLMAP_PREFIX" \
+  -DCeres_DIR="$CERES_PREFIX/lib/cmake/Ceres" \
   -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCH" \
   -DCUDA_ENABLED=ON \
   -DGUI_ENABLED=OFF \

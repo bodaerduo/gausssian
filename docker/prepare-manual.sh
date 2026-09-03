@@ -5,6 +5,8 @@ PROJECT_ROOT="${PROJECT_ROOT:-/workspace/gaussian}"
 APP_ROOT="${APP_ROOT:-/app}"
 SRC_ROOT="${SRC_ROOT:-/opt/src}"
 IMAGE_ONLY="${IMAGE_ONLY:-false}"
+CERES_REF="${CERES_REF:-2.2.0}"
+CUDA_ARCH="${CUDA_ARCH:-89}"
 
 if [[ "$(id -u)" != "0" ]]; then
   echo "请在 devel 容器内以 root 执行。" >&2
@@ -29,8 +31,20 @@ apt-get install -y --no-install-recommends \
   libboost-program-options-dev libboost-graph-dev libboost-system-dev \
   libeigen3-dev libopenimageio-dev openimageio-tools libopenexr-dev libmetis-dev \
   libgoogle-glog-dev libgtest-dev libgmock-dev libsqlite3-dev \
-  libglew-dev libcgal-dev libceres-dev libsuitesparse-dev \
+  libglew-dev libcgal-dev libsuitesparse-dev libgflags-dev libabsl-dev \
   libcurl4-openssl-dev libssl-dev libblas-dev liblapack-dev libvulkan-dev
+
+if [[ ! -d "$SRC_ROOT/ceres/.git" ]]; then
+  git clone --depth 1 --branch "$CERES_REF" \
+    https://github.com/ceres-solver/ceres-solver.git "$SRC_ROOT/ceres"
+fi
+cmake -S "$SRC_ROOT/ceres" -B "$SRC_ROOT/ceres/build" -GNinja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX=/opt/ceres-cuda \
+  -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCH" \
+  -DUSE_CUDA=ON -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF \
+  -DBUILD_EXAMPLES=OFF -DBUILD_DOCUMENTATION=OFF
+cmake --build "$SRC_ROOT/ceres/build" --target install --parallel "$(nproc)"
 
 if [[ ! -d "$SRC_ROOT/colmap/.git" ]]; then
   git clone --depth 1 --branch "${COLMAP_REF:-main}" \
@@ -40,7 +54,8 @@ mkdir -p /usr/include/opencv4
 cmake -S "$SRC_ROOT/colmap" -B "$SRC_ROOT/colmap/build" -GNinja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_INSTALL_PREFIX=/usr/local \
-  -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCH:-89}" \
+  -DCeres_DIR=/opt/ceres-cuda/lib/cmake/Ceres \
+  -DCMAKE_CUDA_ARCHITECTURES="$CUDA_ARCH" \
   -DCUDA_ENABLED=ON -DGUI_ENABLED=OFF -DTESTS_ENABLED=OFF
 cmake --build "$SRC_ROOT/colmap/build" --target install --parallel "$(nproc)"
 

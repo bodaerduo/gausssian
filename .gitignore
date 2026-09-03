@@ -12,6 +12,7 @@
 /engines/colmap/build/
 /engines/brush/target/
 /engines/colmap/
+/engines/ceres/
 /engines/brush/
 /runtime/
 /data/

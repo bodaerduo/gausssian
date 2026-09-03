@@ -4,6 +4,7 @@ ARG CUDA_RUNTIME_IMAGE=swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia
 FROM ${CUDA_BUILD_IMAGE} AS builder
 
 ARG COLMAP_REF=main
+ARG CERES_REF=2.2.0
 ARG BRUSH_REF=main
 ARG CUDA_ARCH=89
 ENV DEBIAN_FRONTEND=noninteractive
@@ -15,6 +16,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /src
+RUN git clone --depth 1 --branch "${CERES_REF}" \
+    https://github.com/ceres-solver/ceres-solver.git ceres
 RUN git clone --depth 1 --branch "${COLMAP_REF}" \
     https://github.com/colmap/colmap.git colmap
 
@@ -25,14 +28,26 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     libboost-program-options-dev libboost-graph-dev libboost-system-dev \
     libeigen3-dev libopenimageio-dev openimageio-tools libopenexr-dev libmetis-dev \
     libgoogle-glog-dev libgtest-dev libgmock-dev libsqlite3-dev \
-    libglew-dev libcgal-dev libceres-dev libsuitesparse-dev \
+    libglew-dev libcgal-dev libsuitesparse-dev libgflags-dev libabsl-dev \
     libcurl4-openssl-dev libssl-dev libblas-dev liblapack-dev \
     libvulkan-dev \
     && rm -rf /var/lib/apt/lists/*
 
+RUN cmake -S /src/ceres -B /build/ceres -GNinja \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/opt/ceres-cuda \
+    -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCH}" \
+    -DUSE_CUDA=ON \
+    -DBUILD_SHARED_LIBS=OFF \
+    -DBUILD_TESTING=OFF \
+    -DBUILD_EXAMPLES=OFF \
+    -DBUILD_DOCUMENTATION=OFF
+RUN cmake --build /build/ceres --target install --parallel
+
 RUN cmake -S /src/colmap -B /build/colmap -GNinja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=/usr/local \
+    -DCeres_DIR=/opt/ceres-cuda/lib/cmake/Ceres \
     -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCH}" \
     -DCUDA_ENABLED=ON \
     -DGUI_ENABLED=OFF \
