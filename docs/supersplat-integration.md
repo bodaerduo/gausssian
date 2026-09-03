@@ -6,21 +6,19 @@
 
 ```bash
 chmod +x scripts/*.sh
-APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
-  ./scripts/deploy-all-ubuntu.sh
+APP_DIR="$PWD" ./scripts/setup-supersplat-ubuntu.sh
 ```
 
 部署脚本会额外执行：
 
-- `setup-splat-transform-ubuntu.sh`：安装 `@playcanvas/splat-transform@3.3.3`。
-- `setup-supersplat-ubuntu.sh`：构建固定版本的 SuperSplat 到 `front/public/supersplat`。
+- `setup-supersplat-ubuntu.sh`：安装 `@playcanvas/splat-transform@3.3.3` 并构建固定版本的 SuperSplat 到 `front/public/supersplat`。
 
 生产环境建议固定版本：
 
 ```bash
 SUPER_SPLAT_REF=<commit-or-tag> \
 SPLAT_TRANSFORM_VERSION=3.3.3 \
-./scripts/deploy-all-ubuntu.sh
+./scripts/setup-supersplat-ubuntu.sh
 ```
 
 ## GPU 容器部署

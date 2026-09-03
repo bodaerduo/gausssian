@@ -18,12 +18,9 @@ gaussian/
 │   ├── folder-layout.md   # 目录职责
 │   ├── ubuntu-deployment.md # Ubuntu 部署
 │   └── 视频重建Gaussian方案对比与推荐.md # 方案调研
-├── scripts/               # Bash 部署和引擎安装脚本
-│   ├── deploy-all-ubuntu.sh
-│   ├── deploy-front-ubuntu.sh
-│   ├── setup-backend-ubuntu.sh
-│   ├── setup-colmap-ubuntu.sh
-│   └── setup-brush-ubuntu.sh
+├── scripts/               # 已运行系统更新 + 新模块独立部署
+│   ├── update-and-restart-ready.sh
+│   └── setup-supersplat-ubuntu.sh
 ├── docker/                # 单镜像 GPU 容器定义
 │   ├── backend.Dockerfile
 │   ├── compose.yml

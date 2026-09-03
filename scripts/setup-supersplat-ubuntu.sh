@@ -38,6 +38,11 @@ fi
 cd "$SOURCE_DIR"
 log "安装 SuperSplat 依赖"
 if [[ -f package-lock.json ]]; then npm ci --no-audit --no-fund; else npm install --no-audit --no-fund; fi
+log "安装 SuperSplat 优化 CLI"
+as_root apt-get update
+as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y libvulkan1
+as_root npm install --global --no-audit --no-fund "@playcanvas/splat-transform@${SPLAT_TRANSFORM_VERSION:-3.3.3}"
+command -v splat-transform >/dev/null 2>&1 || die "SplatTransform 安装后不可用"
 log "构建 SuperSplat"
 npm run build
 [[ -f dist/index.html ]] || die "SuperSplat 构建没有生成 dist/index.html"

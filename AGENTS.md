@@ -35,37 +35,16 @@ COLMAP 负责相机位姿和稀疏重建，Brush 负责 Gaussian 训练；API/Wo
 
 ## Ubuntu 部署流程
 
-在服务器上进入本项目根目录执行，项目放在哪个绝对路径都可以：
+项目的 COLMAP、Brush、FastAPI 和前端服务由宿主机手动安装并长期运行。本仓库只为新增模块提供独立脚本：
 
 ```bash
-chmod +x scripts/*.sh
-./scripts/setup-colmap-ubuntu.sh
-./scripts/setup-brush-ubuntu.sh
-./scripts/setup-backend-ubuntu.sh
-DEMO_MODE=false ./scripts/deploy-front-ubuntu.sh
+chmod +x scripts/setup-supersplat-ubuntu.sh
+APP_DIR="$PWD" ./scripts/setup-supersplat-ubuntu.sh
 ```
 
-也可以一次执行：
+代码更新和容器重启使用 `scripts/update-and-restart-ready.sh`；不要重新执行已移除的全链路安装脚本。
 
-```bash
-DEMO_MODE=false ./scripts/deploy-all-ubuntu.sh
-```
-
-服务器已安装 CUDA toolkit、且 `nvcc --version` 正常时，使用：
-
-```bash
-APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
-./scripts/deploy-all-ubuntu.sh
-```
-
-当前服务器使用 root 部署时，直接执行：
-
-```bash
-APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
-./scripts/deploy-all-ubuntu.sh
-```
-
-systemd 服务将以 root 运行；脚本也兼容有 sudo 权限的普通用户。
+新增模块只执行其对应脚本，避免影响已经运行的服务。
 
 所有脚本都默认通过自身位置计算项目根目录；如脚本和项目不在同一目录，可显式传入 `APP_DIR=/path/to/gaussian`。
 

@@ -10,7 +10,7 @@
 - `engines/brush/`：官方 Brush 源码。
 - `docs/`：架构、流程、Ubuntu 部署和方案文档。
 - [`docs/开源视频三维重建与动态高斯方案调研.md`](./docs/开源视频三维重建与动态高斯方案调研.md)：流式重建、动态 Gaussian 与当前 COLMAP + Brush 的选型对比。
-- `scripts/`：前端、后端、COLMAP、Brush 的部署脚本。
+- `scripts/`：已运行系统的更新重启脚本，以及新增模块的独立部署脚本。
 - `docker/`：基于 CUDA runtime 的单镜像 GPU 容器定义。
 
 ## 建模流程
@@ -20,34 +20,20 @@
 → output/final.ply → SSE 推送进度 → 前端下载模型
 ```
 
-## Ubuntu 快速部署
+## Ubuntu 模块部署
 
-在服务器上进入本项目根目录后执行：
-
-```bash
-chmod +x scripts/*.sh
-DEMO_MODE=false ./scripts/deploy-all-ubuntu.sh
-```
-
-如果服务器已安装 CUDA toolkit 且 `nvcc --version` 正常，推荐使用：
+现有 COLMAP、Brush、FastAPI 和前端已经由宿主机手动安装并运行，不再提供全链路安装脚本。新增 SuperSplat 时只执行对应模块脚本：
 
 ```bash
-APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
-./scripts/deploy-all-ubuntu.sh
+chmod +x scripts/setup-supersplat-ubuntu.sh
+APP_DIR="$PWD" ./scripts/setup-supersplat-ubuntu.sh
 ```
 
-当前部署脚本支持 root 直接执行：
+代码更新和容器重启继续使用 `scripts/update-and-restart-ready.sh`。GPU 容器部署入口为：
 
 ```bash
-APP_DIR="$PWD" INSTALL_CUDA=false DEMO_MODE=false \
-./scripts/deploy-all-ubuntu.sh
+docker compose -p gaussian -f docker/compose.yml up -d --build
 ```
-
-root 执行时 systemd 中的 API/Worker 和前端服务也会以 root 运行。
-
-脚本默认按自身位置识别项目根目录，不依赖固定的服务器绝对路径。也可以使用 `APP_DIR=/path/to/gaussian` 指定项目目录。
-
-`engines/colmap/` 和 `engines/brush/` 为可选的本地源码缓存，已加入 Git 忽略；部署服务器没有源码时，安装脚本会从官方仓库自动拉取。
 
 详细说明：
 
