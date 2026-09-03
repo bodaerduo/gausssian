@@ -1029,3 +1029,13 @@ body { font-family: "Fira Sans", Inter, "PingFang SC", "Microsoft YaHei", ui-san
 .speed-control input { width: 82px !important; }
 .speed-control output { min-width: 28px; color: rgba(255, 255, 255, .9); font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; }
 @media (max-width: 700px) { .roam-cockpit { right: auto !important; bottom: 12px !important; left: 50% !important; } .roam-cockpit .roam-controls { gap: 10px; } .speed-control { display: flex !important; } }
+
+/* Detail view contrast: the scene stays dark, while its surrounding metadata remains readable. */
+.model-detail { border-color: #c7d7e6 !important; background: #ffffff !important; color: #12345b !important; }
+.model-detail .detail-heading h2, .model-detail .detail-stats strong { color: #12345b !important; }
+.model-detail .detail-heading .eyebrow, .model-detail .detail-id, .model-detail .detail-stats span, .model-detail .detail-footer span { color: #58718c !important; }
+.model-detail .detail-footer strong { color: #284d72 !important; }
+.model-detail .detail-stage { border-color: #9fb9d0 !important; background: #081632 !important; }
+.model-detail .stage-action { border-color: rgba(255, 255, 255, .58) !important; color: #ffffff !important; background: rgba(7, 20, 47, .78) !important; }
+.model-detail .stage-action:hover { border-color: #70d8c4 !important; color: #ffffff !important; background: rgba(15, 42, 67, .92) !important; }
+.model-detail .stage-chrome { color: rgba(255, 255, 255, .82) !important; }

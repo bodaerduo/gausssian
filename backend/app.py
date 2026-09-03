@@ -44,6 +44,7 @@ DATA_ROOT_VALUE = os.getenv("GAUSSIAN_DATA_ROOT", "").strip()
 DATA_ROOT = Path(DATA_ROOT_VALUE) if DATA_ROOT_VALUE else PROJECT_ROOT / "runtime" / "data"
 FFMPEG_BIN = os.getenv("FFMPEG_BIN", "/usr/bin/ffmpeg")
 FFPROBE_BIN = os.getenv("FFPROBE_BIN", "/usr/bin/ffprobe")
+VIDEO_MAX_DIMENSION = env_int("GAUSSIAN_VIDEO_MAX_DIMENSION", 1920)
 COLMAP_BIN = os.getenv("COLMAP_BIN", "/usr/local/bin/colmap")
 BRUSH_BIN = os.getenv("BRUSH_BIN", "/usr/local/bin/brush-cli")
 BRUSH_EXTRA_ARGS = shlex.split(os.getenv("BRUSH_EXTRA_ARGS", ""))
@@ -230,10 +231,26 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
     if source_kind == "video":
         emit(job_id, phase="素材检查", progress=8, message="正在读取视频信息")
         run_command(job_id, [FFPROBE_BIN, "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", str(source_path)])
-        emit(job_id, phase="FFmpeg 抽帧", progress=12, message="正在从视频抽取多视角帧")
+        emit(
+            job_id,
+            phase="FFmpeg 抽帧",
+            progress=12,
+            message=f"正在将视频限制到最长边 {VIDEO_MAX_DIMENSION}px 并抽取多视角帧",
+        )
         run_command(
             job_id,
-            [FFMPEG_BIN, "-hide_banner", "-loglevel", "warning", "-y", "-i", str(source_path), "-vf", f"fps={config['fps']}", str(images / "%06d.jpg")],
+            [
+                FFMPEG_BIN,
+                "-hide_banner",
+                "-loglevel",
+                "warning",
+                "-y",
+                "-i",
+                str(source_path),
+                "-vf",
+                f"fps={config['fps']},scale={VIDEO_MAX_DIMENSION}:{VIDEO_MAX_DIMENSION}:force_original_aspect_ratio=decrease",
+                str(images / "%06d.jpg"),
+            ],
         )
     else:
         emit(job_id, phase="FFmpeg 抽帧", progress=12, message="图片组无需抽帧，正在整理输入")

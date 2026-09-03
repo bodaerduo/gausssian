@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 type GaussianViewer = {
   addSplatScene: (path: string, options?: Record<string, unknown>) => Promise<unknown>;
   start: () => void;
+  render: () => void;
   dispose: () => Promise<void> | void;
 };
 
@@ -73,10 +74,19 @@ export function PlyPreview({ modelUrl, modelName, compact = false, onCaptureRead
       const capture: PreviewCapture = () => {
         const canvas = container.querySelector('canvas');
         if (!(canvas instanceof HTMLCanvasElement) || canvas.width === 0 || canvas.height === 0) return undefined;
-        try { return canvas.toDataURL('image/jpeg', 0.82); } catch { return undefined; }
+        try {
+          // The viewer uses a WebGL canvas whose back buffer may be cleared
+          // after a frame. Render immediately before reading it so card covers
+          // never capture the initial black clear frame.
+          viewer?.render();
+          return canvas.toDataURL('image/jpeg', 0.82);
+        } catch { return undefined; }
       };
-      onCaptureReadyRef.current?.(capture);
-      captureFrame = window.requestAnimationFrame(() => { captureFrame = window.requestAnimationFrame(() => { onCaptureReadyRef.current?.(capture); }); });
+      captureFrame = window.requestAnimationFrame(() => {
+        captureFrame = window.requestAnimationFrame(() => {
+          window.setTimeout(() => onCaptureReadyRef.current?.(capture), 350);
+        });
+      });
     }).catch((cause: unknown) => {
       if (!cancelled) {
         setState('error');
