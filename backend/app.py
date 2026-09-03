@@ -294,7 +294,10 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
             "--Mapper.ba_gpu_index",
             "0",
         ],
-        reject_output=("Falling back to CPU-based", "compiled without CUDA support"),
+        # Ceres 2.2 can use CUDA dense solvers without optional cuDSS. COLMAP
+        # still logs a sparse-solver fallback warning in that configuration;
+        # only reject when CUDA itself is unavailable.
+        reject_output=("compiled without CUDA support", "no CUDA GPU is available"),
     )
     model_dir = sparse / "0"
     if not (model_dir / "cameras.bin").exists() or not (model_dir / "images.bin").exists():
