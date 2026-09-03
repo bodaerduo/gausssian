@@ -22,6 +22,7 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
   const speedRef = useRef(1);
   const jumpVelocityRef = useRef(0);
   const groundedRef = useRef(true);
+  const jumpingRef = useRef(false);
   const [loaded, setLoaded] = useState(false);
   const [speed, setSpeed] = useState(1);
   const [error, setError] = useState('');
@@ -102,6 +103,7 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
           if (key === ' ' && groundedRef.current) {
             jumpVelocityRef.current = 4.4;
             groundedRef.current = false;
+            jumpingRef.current = true;
           }
           if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) event.preventDefault();
         };
@@ -131,6 +133,7 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
           previous = now;
           const keys = keysRef.current;
           const move = 2.2 * (keys.has('shift') ? 2.4 : 1) * speedRef.current;
+          const verticalMove = move * 4;
           if (keys.has('q')) yaw -= 1.8 * dt;
           if (keys.has('e')) yaw += 1.8 * dt;
           const forward = new THREE.Vector3(Math.sin(yaw), 0, -Math.cos(yaw));
@@ -143,16 +146,18 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
           playerPosition.addScaledVector(velocity, dt);
           const verticalInput = (keys.has('r') ? 1 : 0) - (keys.has('f') ? 1 : 0);
           if (verticalInput !== 0) {
-            playerPosition.y = Math.max(1.15, playerPosition.y + verticalInput * move * dt);
+            playerPosition.y = Math.max(1.15, playerPosition.y + verticalInput * verticalMove * dt);
             jumpVelocityRef.current = 0;
             groundedRef.current = playerPosition.y <= 1.15;
-          } else {
+            jumpingRef.current = false;
+          } else if (jumpingRef.current) {
             jumpVelocityRef.current -= 11 * dt;
             playerPosition.y += jumpVelocityRef.current * dt;
             if (playerPosition.y <= 1.15) {
               playerPosition.y = 1.15;
               jumpVelocityRef.current = 0;
               groundedRef.current = true;
+              jumpingRef.current = false;
             }
           }
           const lookDirection = new THREE.Vector3(Math.sin(yaw), Math.sin(pitch), -Math.cos(yaw));
@@ -210,6 +215,6 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
     };
   }, [modelUrl]);
 
-  const virtualKey = (key: string, label = key.toUpperCase()) => <button className={pressedKeys.includes(key) ? 'virtual-key pressed' : 'virtual-key'} type="button" aria-label={`按住 ${label}`} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); keysRef.current.add(key); setPressedKeys((current) => current.includes(key) ? current : [...current, key]); if (key === ' ' && groundedRef.current) { jumpVelocityRef.current = 4.4; groundedRef.current = false; } }} onPointerUp={() => { keysRef.current.delete(key); setPressedKeys((current) => current.filter((value) => value !== key)); }} onPointerCancel={() => { keysRef.current.delete(key); setPressedKeys((current) => current.filter((value) => value !== key)); }}>{label}</button>;
+  const virtualKey = (key: string, label = key.toUpperCase()) => <button className={pressedKeys.includes(key) ? 'virtual-key pressed' : 'virtual-key'} type="button" aria-label={`按住 ${label}`} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); keysRef.current.add(key); setPressedKeys((current) => current.includes(key) ? current : [...current, key]); if (key === ' ' && groundedRef.current) { jumpVelocityRef.current = 4.4; groundedRef.current = false; jumpingRef.current = true; } }} onPointerUp={() => { keysRef.current.delete(key); setPressedKeys((current) => current.filter((value) => value !== key)); }} onPointerCancel={() => { keysRef.current.delete(key); setPressedKeys((current) => current.filter((value) => value !== key)); }}>{label}</button>;
   return <div className="roam-overlay" role="dialog" aria-modal="true" aria-label={`${modelName} 漫游模式`}><div className="roam-shell"><div className="roam-canvas"><div className="roam-engine" ref={mountRef} /><div className="roam-crosshair" /><div className="roam-status"><span className={loaded ? 'status-pip' : 'status-pip amber'} />{error ? error : loaded ? '真实 PLY 场景已载入' : '正在加载真实 Gaussian 场景…'}</div></div><div className="roam-cockpit"><div className="roam-controls"><div className="virtual-keyboard"><div className="key-row">{virtualKey('q')} {virtualKey('w')} {virtualKey('e')} {virtualKey('r', 'R ↑')}</div><div className="key-row">{virtualKey('a')} {virtualKey('s')} {virtualKey('d')} {virtualKey('f', 'F ↓')}</div><div className="key-row key-row-wide">{virtualKey(' ', 'SPACE')}</div></div><label className="speed-control" aria-label="调整漫游速度">速度 <input type="range" min="0.6" max="2" step="0.1" value={speed} onChange={(event) => { const next = Number(event.target.value); speedRef.current = next; setSpeed(next); }} /><output>{speed.toFixed(1)}×</output></label></div></div></div></div>;
 }
