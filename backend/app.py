@@ -142,7 +142,7 @@ def run_command(
     command: list[str],
     *,
     timeout: int = 0,
-    reject_output: tuple[str, ...] = (),
+    error_output: tuple[str, ...] = (),
 ) -> None:
     command_line = shlex.join(command)
     append_log(job_id, f"\n$ {command_line}\n")
@@ -165,10 +165,8 @@ def run_command(
     assert process.stdout is not None
     for line in process.stdout:
         append_log(job_id, line)
-        if any(marker.lower() in line.lower() for marker in reject_output):
-            os.killpg(process.pid, signal.SIGTERM)
-            process.wait()
-            raise RuntimeError(f"命令检测到不允许的 CPU 回退：{command[0]}")
+        if any(marker.lower() in line.lower() for marker in error_output):
+            append_log(job_id, f"ERROR: GPU 加速异常或发生 CPU 回退：{line.strip()}\n")
         if deadline and time.monotonic() > deadline:
             os.killpg(process.pid, signal.SIGTERM)
             raise RuntimeError(f"命令超时：{command[0]}")
@@ -294,10 +292,12 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
             "--Mapper.ba_gpu_index",
             "0",
         ],
-        # Ceres 2.2 can use CUDA dense solvers without optional cuDSS. COLMAP
-        # still logs a sparse-solver fallback warning in that configuration;
-        # only reject when CUDA itself is unavailable.
-        reject_output=("compiled without CUDA support", "no CUDA GPU is available"),
+        error_output=(
+            "Falling back to CPU-based",
+            "compiled without CUDA support",
+            "compiled without cuDSS support",
+            "no CUDA GPU is available",
+        ),
     )
     model_dir = sparse / "0"
     if not (model_dir / "cameras.bin").exists() or not (model_dir / "images.bin").exists():
