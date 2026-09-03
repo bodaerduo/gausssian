@@ -11,6 +11,8 @@ services:
       NVIDIA_VISIBLE_DEVICES: all
       # Brush uses headless Vulkan; graphics is required even without a display.
       NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics
+      # Do not let Brush silently select its CPU backend when a discrete GPU is available.
+      CUBECL_WGPU_DEFAULT_DEVICE: "${CUBECL_WGPU_DEFAULT_DEVICE:-DiscreteGpu(0)}"
     volumes:
       - ../:/workspace/gaussian
       - ../runtime/data:/app/runtime/data

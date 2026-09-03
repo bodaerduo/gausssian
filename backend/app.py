@@ -47,6 +47,8 @@ FFPROBE_BIN = os.getenv("FFPROBE_BIN", "/usr/bin/ffprobe")
 COLMAP_BIN = os.getenv("COLMAP_BIN", "/usr/local/bin/colmap")
 BRUSH_BIN = os.getenv("BRUSH_BIN", "/usr/local/bin/brush-cli")
 BRUSH_EXTRA_ARGS = shlex.split(os.getenv("BRUSH_EXTRA_ARGS", ""))
+CUBECL_WGPU_DEFAULT_DEVICE = os.getenv("CUBECL_WGPU_DEFAULT_DEVICE", "DiscreteGpu(0)").strip() or "DiscreteGpu(0)"
+os.environ.setdefault("CUBECL_WGPU_DEFAULT_DEVICE", CUBECL_WGPU_DEFAULT_DEVICE)
 MAX_UPLOAD_BYTES = env_int("GAUSSIAN_MAX_UPLOAD_BYTES", 2 * 1024 * 1024 * 1024)
 MAX_WORKERS = env_int("GAUSSIAN_MAX_WORKERS", 1)
 MATCHER = os.getenv("COLMAP_MATCHER", "exhaustive")
@@ -134,7 +136,13 @@ def append_log(job_id: str, text: str) -> None:
                 stream.write(f"[{timestamp}] [{job_id}] {line}\n")
 
 
-def run_command(job_id: str, command: list[str], *, timeout: int = 0) -> None:
+def run_command(
+    job_id: str,
+    command: list[str],
+    *,
+    timeout: int = 0,
+    reject_output: tuple[str, ...] = (),
+) -> None:
     command_line = shlex.join(command)
     append_log(job_id, f"\n$ {command_line}\n")
     try:
@@ -156,6 +164,10 @@ def run_command(job_id: str, command: list[str], *, timeout: int = 0) -> None:
     assert process.stdout is not None
     for line in process.stdout:
         append_log(job_id, line)
+        if any(marker.lower() in line.lower() for marker in reject_output):
+            os.killpg(process.pid, signal.SIGTERM)
+            process.wait()
+            raise RuntimeError(f"命令检测到不允许的 CPU 回退：{command[0]}")
         if deadline and time.monotonic() > deadline:
             os.killpg(process.pid, signal.SIGTERM)
             raise RuntimeError(f"命令超时：{command[0]}")
@@ -238,7 +250,7 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
     emit(job_id, phase="COLMAP 相机重建", progress=25, message=f"正在提取特征 · {count} 张图片")
     run_command(
         job_id,
-        [COLMAP_BIN, "feature_extractor", "--database_path", str(database), "--image_path", str(images), "--ImageReader.single_camera", "1", "--FeatureExtraction.use_gpu", "1"],
+        [COLMAP_BIN, "feature_extractor", "--database_path", str(database), "--image_path", str(images), "--ImageReader.single_camera", "1", "--FeatureExtraction.use_gpu", "1", "--FeatureExtraction.gpu_index", "0"],
     )
 
     matcher_name = "sequential" if source_kind == "video" else MATCHER
@@ -246,10 +258,27 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
         raise RuntimeError("COLMAP_MATCHER 只能是 exhaustive 或 sequential")
     matcher_command = f"{matcher_name}_matcher"
     emit(job_id, phase="COLMAP 相机重建", progress=45, message=f"正在进行{matcher_name}匹配")
-    run_command(job_id, [COLMAP_BIN, matcher_command, "--database_path", str(database), "--FeatureMatching.use_gpu", "1"])
+    run_command(job_id, [COLMAP_BIN, matcher_command, "--database_path", str(database), "--FeatureMatching.use_gpu", "1", "--FeatureMatching.gpu_index", "0"])
 
     emit(job_id, phase="COLMAP 相机重建", progress=65, message="正在估计相机位姿和稀疏点云")
-    run_command(job_id, [COLMAP_BIN, "mapper", "--database_path", str(database), "--image_path", str(images), "--output_path", str(sparse)])
+    run_command(
+        job_id,
+        [
+            COLMAP_BIN,
+            "mapper",
+            "--database_path",
+            str(database),
+            "--image_path",
+            str(images),
+            "--output_path",
+            str(sparse),
+            "--Mapper.ba_use_gpu",
+            "1",
+            "--Mapper.ba_gpu_index",
+            "0",
+        ],
+        reject_output=("Falling back to CPU-based", "compiled without CUDA support"),
+    )
     model_dir = sparse / "0"
     if not (model_dir / "cameras.bin").exists() or not (model_dir / "images.bin").exists():
         raise RuntimeError("COLMAP 未生成 sparse/0 相机模型，请检查素材重叠和注册率")
