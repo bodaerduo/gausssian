@@ -7,6 +7,7 @@ SRC_ROOT="${SRC_ROOT:-/opt/src}"
 IMAGE_ONLY="${IMAGE_ONLY:-false}"
 CERES_REF="${CERES_REF:-2.2.0}"
 CUDA_ARCH="${CUDA_ARCH:-89}"
+SUPER_SPLAT_REF="${SUPER_SPLAT_REF:-main}"
 
 if [[ "$(id -u)" != "0" ]]; then
   echo "请在 devel 容器内以 root 执行。" >&2
@@ -76,6 +77,24 @@ if ! command -v node >/dev/null 2>&1 || [[ "$(node -p 'process.versions.node.spl
   apt-get install -y --no-install-recommends nodejs
 fi
 
+if ! command -v splat-transform >/dev/null 2>&1; then
+  npm install --global --no-audit --no-fund @playcanvas/splat-transform@3.3.3
+fi
+
+CODE_ROOT="$APP_ROOT"
+if [[ "$IMAGE_ONLY" == "true" ]]; then
+  CODE_ROOT="$PROJECT_ROOT"
+fi
+SUPER_SPLAT_DIR="$SRC_ROOT/supersplat"
+if [[ ! -d "$SUPER_SPLAT_DIR/.git" ]]; then
+  git clone --depth 1 --branch "$SUPER_SPLAT_REF" https://github.com/playcanvas/supersplat.git "$SUPER_SPLAT_DIR"
+fi
+cd "$SUPER_SPLAT_DIR"
+npm ci --no-audit --no-fund
+npm run build
+mkdir -p "$CODE_ROOT/front/public/supersplat"
+cp -a dist/. "$CODE_ROOT/front/public/supersplat/"
+
 CODE_ROOT="$APP_ROOT"
 if [[ "$IMAGE_ONLY" == "true" ]]; then
   CODE_ROOT="$PROJECT_ROOT"
@@ -103,6 +122,7 @@ nvidia-smi
 nvcc --version
 colmap -h >/dev/null
 brush-cli --help >/dev/null
+splat-transform --version >/dev/null
 if [[ "$IMAGE_ONLY" == "true" ]]; then
   rm -rf "$APP_ROOT" "$SRC_ROOT" /root/.cargo /root/.rustup
 fi

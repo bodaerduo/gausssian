@@ -47,7 +47,7 @@ section "编译工具"
 for command_name in gcc g++ cmake ninja make pkg-config git curl; do check_command "$command_name"; done
 
 section "运行时工具"
-for command_name in python3 pip3 ffmpeg ffprobe node npm colmap brush-cli; do check_command "$command_name"; done
+for command_name in python3 pip3 ffmpeg ffprobe node npm colmap brush-cli splat-transform; do check_command "$command_name"; done
 
 if command -v python3 >/dev/null 2>&1; then
   python3 - <<'PY'

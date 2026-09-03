@@ -54,6 +54,37 @@ MAX_UPLOAD_BYTES = env_int("GAUSSIAN_MAX_UPLOAD_BYTES", 2 * 1024 * 1024 * 1024)
 MAX_WORKERS = env_int("GAUSSIAN_MAX_WORKERS", 1)
 MATCHER = os.getenv("COLMAP_MATCHER", "exhaustive")
 
+PRODUCT_ROUTES = [
+    {
+        "id": "brush_static",
+        "name": "标准 Gaussian 建模",
+        "kind": "production",
+        "enabled": True,
+        "asset_type": "gaussian",
+        "description": "现有 FFmpeg、COLMAP、Brush 和 SuperSplat 生产路线。",
+        "features": ["稳定生成 final.ply", "SuperSplat 编辑", "PLY/SOG 版本管理"],
+    },
+    {
+        "id": "abot_recon_poc",
+        "name": "ABot-Recon 流式扫描",
+        "kind": "poc",
+        "enabled": os.getenv("ABOT_RECON_ENABLED", "false").lower() == "true",
+        "asset_type": "pointcloud_preview",
+        "description": "固定 12 帧局部上下文的流式点图、轨迹和置信度预览。",
+        "features": ["逐窗口点云增长", "相机轨迹", "置信度过滤", "可选回环优化"],
+    },
+    {
+        "id": "lingbot_map",
+        "name": "LingBot-Map 空间地图",
+        "kind": "showcase",
+        "enabled": os.getenv("LINGBOT_MAP_ENABLED", "false").lower() == "true",
+        "asset_type": "pointcloud_preview",
+        "description": "面向长视频的流式空间重建、轨迹展示和点云飞行回放。",
+        "features": ["长视频滑窗推理", "Viser 交互查看", "鸟瞰/跟随镜头", "天空遮罩"],
+    },
+]
+SPLAT_TRANSFORM_BIN = os.getenv("SPLAT_TRANSFORM_BIN", "splat-transform")
+
 STATE_LOCK = threading.RLock()
 LOG_LOCK = threading.RLock()
 JOB_LOCKS: dict[str, threading.RLock] = {}
@@ -210,8 +241,75 @@ def validate_ply(path: Path) -> int:
         raise RuntimeError("输出文件不是合法的 PLY")
     for line in header.decode("ascii", errors="ignore").splitlines():
         if line.startswith("element vertex "):
-            return int(line.split()[-1])
+            count = int(line.split()[-1])
+            if count <= 0:
+                raise RuntimeError("PLY 顶点数量必须大于 0")
+            return count
     raise RuntimeError("PLY 缺少 vertex 数量")
+
+
+def variant_dir(job_id: str) -> Path:
+    return job_dir(job_id) / "output" / "variants"
+
+
+def version_name(version: int) -> str:
+    return f"v{version:03d}"
+
+
+def next_variant_version(job_id: str) -> int:
+    root = variant_dir(job_id)
+    if not root.exists():
+        return 1
+    versions = []
+    for path in root.glob("v*.ply"):
+        try:
+            versions.append(int(path.stem[1:]))
+        except ValueError:
+            continue
+    return max(versions, default=0) + 1
+
+
+def variant_path(job_id: str, version: int) -> Path:
+    return variant_dir(job_id) / f"{version_name(version)}.ply"
+
+
+def parse_variant(version: str) -> int:
+    match = re.fullmatch(r"v?(\d{1,6})", version)
+    if not match:
+        raise HTTPException(status_code=404, detail="编辑版本不存在")
+    return int(match.group(1))
+
+
+def optimization_entry(job_id: str, version: int, decimate: str | None, harmonics: int) -> None:
+    source = variant_path(job_id, version)
+    output_dir = variant_dir(job_id)
+    optimized = output_dir / f"{version_name(version)}.compressed.ply"
+    sog = output_dir / f"{version_name(version)}.sog"
+    try:
+        if not shutil.which(SPLAT_TRANSFORM_BIN):
+            raise RuntimeError(f"未找到 SplatTransform：{SPLAT_TRANSFORM_BIN}")
+        command = [SPLAT_TRANSFORM_BIN, str(source), "--filter-nan", "--filter-harmonics", str(max(0, min(3, harmonics)))]
+        if decimate:
+            command.extend(["--decimate", decimate])
+        command.append(str(optimized))
+        result = subprocess.run(command, capture_output=True, text=True, timeout=3600, check=False)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or "SplatTransform 压缩失败")
+        sog_result = subprocess.run([SPLAT_TRANSFORM_BIN, str(optimized), str(sog)], capture_output=True, text=True, timeout=3600, check=False)
+        if sog_result.returncode != 0:
+            raise RuntimeError(sog_result.stderr.strip() or "SOG 导出失败")
+        state = read_state(job_id) or {}
+        variants = state.get("variants", [])
+        for item in variants:
+            if item.get("version") == version:
+                item.update({"optimization": "completed", "compressed_url": f"/api/v1/reconstructions/{job_id}/variants/{version}/compressed", "sog_url": f"/api/v1/reconstructions/{job_id}/variants/{version}/sog", "compressed_bytes": optimized.stat().st_size, "sog_bytes": sog.stat().st_size})
+        write_state(job_id, state)
+    except Exception as exc:  # noqa: BLE001 - background boundary
+        state = read_state(job_id) or {}
+        for item in state.get("variants", []):
+            if item.get("version") == version:
+                item.update({"optimization": "failed", "optimization_error": str(exc)})
+        write_state(job_id, state)
 
 
 def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name: str) -> None:
@@ -384,8 +482,15 @@ def health() -> dict[str, Any]:
             "ffprobe": shutil.which(FFPROBE_BIN) or Path(FFPROBE_BIN).exists(),
             "colmap": shutil.which(COLMAP_BIN) or Path(COLMAP_BIN).exists(),
             "brush": shutil.which(BRUSH_BIN) or Path(BRUSH_BIN).exists(),
+            "splat_transform": bool(shutil.which(SPLAT_TRANSFORM_BIN)),
         },
     }
+
+
+@app.get("/api/v1/products")
+def products() -> dict[str, list[dict[str, Any]]]:
+    """Return additive product routes without changing the default Brush route."""
+    return {"products": PRODUCT_ROUTES}
 
 
 @app.post("/api/v1/reconstructions", status_code=202)
@@ -455,6 +560,127 @@ def list_reconstructions() -> dict[str, list[dict[str, Any]]]:
                 jobs.append(state)
     jobs.sort(key=lambda item: item.get("created_at", ""), reverse=True)
     return {"jobs": jobs}
+
+
+@app.post("/api/v1/reconstructions/import", status_code=201)
+async def import_ply(file: UploadFile = File(...)) -> dict[str, Any]:
+    filename = safe_filename(file.filename, "imported.ply")
+    if Path(filename).suffix.lower() != ".ply":
+        raise HTTPException(status_code=400, detail="只支持导入 Gaussian PLY 文件")
+    job_id = f"gs-{uuid.uuid4().hex[:12]}"
+    root = job_dir(job_id)
+    root.mkdir(parents=True, exist_ok=False)
+    JOB_LOCKS[job_id] = threading.RLock()
+    target = root / "output" / "final.ply"
+    try:
+        await save_upload(file, target)
+        splat_count = validate_ply(target)
+    except Exception as exc:
+        shutil.rmtree(root, ignore_errors=True)
+        JOB_LOCKS.pop(job_id, None)
+        if isinstance(exc, HTTPException):
+            raise
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    state = {
+        "id": job_id,
+        "status": "completed",
+        "progress": 100,
+        "phase": "PLY 导入",
+        "message": "PLY 模型已导入",
+        "quality": "imported",
+        "sourceName": filename,
+        "sourceKind": "ply",
+        "created_at": now(),
+        "updated_at": now(),
+        "ply_bytes": target.stat().st_size,
+        "splat_count": splat_count,
+        "image_count": 0,
+    }
+    state_path(job_id).write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {"id": job_id, "status": "completed", "modelUrl": f"/api/v1/reconstructions/{job_id}/download", "splat_count": splat_count, "ply_bytes": target.stat().st_size}
+
+
+@app.delete("/api/v1/reconstructions/{job_id}", status_code=204)
+def delete_reconstruction(job_id: str) -> None:
+    if not valid_job_id(job_id):
+        raise HTTPException(status_code=404, detail="任务不存在")
+    state = read_state(job_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if state.get("status") in {"queued", "processing"}:
+        raise HTTPException(status_code=409, detail="任务正在运行，暂不能删除")
+    shutil.rmtree(job_dir(job_id), ignore_errors=False)
+    JOB_LOCKS.pop(job_id, None)
+
+
+@app.post("/api/v1/reconstructions/{job_id}/variants", status_code=201)
+async def upload_variant(job_id: str, file: UploadFile = File(...)) -> dict[str, Any]:
+    if not valid_job_id(job_id) or read_state(job_id) is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if Path(file.filename or "").suffix.lower() != ".ply":
+        raise HTTPException(status_code=400, detail="编辑器只接受 PLY 导出文件")
+    version = next_variant_version(job_id)
+    target = variant_path(job_id, version)
+    await save_upload(file, target)
+    try:
+        count = validate_ply(target)
+    except Exception as exc:
+        target.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    state = read_state(job_id) or {}
+    variants = state.setdefault("variants", [])
+    variants.append({"version": version, "name": safe_filename(file.filename, f"{version_name(version)}.ply"), "splat_count": count, "bytes": target.stat().st_size, "optimization": "not_started", "download_url": f"/api/v1/reconstructions/{job_id}/variants/{version}/download"})
+    write_state(job_id, state)
+    return variants[-1]
+
+
+@app.post("/api/v1/reconstructions/{job_id}/variants/{version}/optimize", status_code=202)
+def optimize_variant(job_id: str, version: str, decimate: str | None = Form(default=None), harmonics: int = Form(default=2)) -> dict[str, Any]:
+    if not valid_job_id(job_id) or read_state(job_id) is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    parsed = parse_variant(version)
+    if not variant_path(job_id, parsed).exists():
+        raise HTTPException(status_code=404, detail="编辑版本不存在")
+    state = read_state(job_id) or {}
+    for item in state.get("variants", []):
+        if item.get("version") == parsed:
+            item["optimization"] = "queued"
+    write_state(job_id, state)
+    EXECUTOR.submit(optimization_entry, job_id, parsed, decimate, harmonics)
+    return {"status": "queued", "version": parsed}
+
+
+@app.get("/api/v1/reconstructions/{job_id}/variants/{version}/download")
+def download_variant(job_id: str, version: str) -> FileResponse:
+    if not valid_job_id(job_id) or read_state(job_id) is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    parsed = parse_variant(version)
+    path = variant_path(job_id, parsed)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="编辑版本不存在")
+    return FileResponse(path, media_type="application/octet-stream", filename=f"{job_id}-{version_name(parsed)}.ply")
+
+
+@app.get("/api/v1/reconstructions/{job_id}/variants/{version}/compressed")
+def download_compressed_variant(job_id: str, version: str) -> FileResponse:
+    if not valid_job_id(job_id) or read_state(job_id) is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    parsed = parse_variant(version)
+    path = variant_dir(job_id) / f"{version_name(parsed)}.compressed.ply"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="压缩版本尚未生成")
+    return FileResponse(path, media_type="application/octet-stream", filename=f"{job_id}-{version_name(parsed)}.compressed.ply")
+
+
+@app.get("/api/v1/reconstructions/{job_id}/variants/{version}/sog")
+def download_sog_variant(job_id: str, version: str) -> FileResponse:
+    if not valid_job_id(job_id) or read_state(job_id) is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    parsed = parse_variant(version)
+    path = variant_dir(job_id) / f"{version_name(parsed)}.sog"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="SOG 版本尚未生成")
+    return FileResponse(path, media_type="application/octet-stream", filename=f"{job_id}-{version_name(parsed)}.sog")
 
 
 @app.get("/api/v1/reconstructions/{job_id}/colmap")

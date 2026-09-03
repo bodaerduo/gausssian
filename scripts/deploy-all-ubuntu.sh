@@ -16,5 +16,10 @@ cd "$APP_DIR"
 DEMO_MODE="${DEMO_MODE:-false}" \
   APP_DIR="$APP_DIR" \
   "$APP_DIR/scripts/deploy-front-ubuntu.sh"
+"$APP_DIR/scripts/setup-splat-transform-ubuntu.sh"
+"$APP_DIR/scripts/setup-supersplat-ubuntu.sh"
+if command -v systemctl >/dev/null 2>&1 && systemctl is-enabled --quiet gaussian-web 2>/dev/null; then
+  systemctl restart gaussian-web
+fi
 
 printf '\n全链路部署完成：%s\n' "$APP_DIR"

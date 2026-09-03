@@ -1,5 +1,14 @@
 ARG CUDA_BUILD_IMAGE=swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.4.1-devel-ubuntu22.04
 ARG CUDA_RUNTIME_IMAGE=swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.4.1-runtime-ubuntu22.04
+ARG SUPER_SPLAT_REF=main
+
+FROM node:22-bookworm AS supersplat
+ARG SUPER_SPLAT_REF
+WORKDIR /src/supersplat
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 --branch "${SUPER_SPLAT_REF}" https://github.com/playcanvas/supersplat.git .
+RUN npm ci --no-audit --no-fund && npm run build
+RUN test -f dist/index.html
 
 FROM ${CUDA_BUILD_IMAGE} AS builder
 
@@ -87,11 +96,13 @@ RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y --no-install-recommends nodejs \
     && npm --version \
     && rm -rf /var/lib/apt/lists/*
+RUN npm install --global --no-audit --no-fund @playcanvas/splat-transform@3.3.3
 
 COPY --from=builder /usr/local/bin/colmap /usr/local/bin/colmap
 COPY --from=builder /usr/local/bin/brush-cli /usr/local/bin/brush-cli
 COPY backend /app/backend
 COPY front /app/front
+COPY --from=supersplat /src/supersplat/dist /app/front/public/supersplat
 COPY docker/start.sh /usr/local/bin/gaussian-start
 RUN chmod 0755 /usr/local/bin/gaussian-start
 

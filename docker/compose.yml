@@ -8,6 +8,7 @@ services:
         CUDA_RUNTIME_IMAGE: ${CUDA_RUNTIME_IMAGE:-swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/nvidia/cuda:12.4.1-runtime-ubuntu22.04}
         COLMAP_REF: ${COLMAP_REF:-main}
         BRUSH_REF: ${BRUSH_REF:-main}
+        SUPER_SPLAT_REF: ${SUPER_SPLAT_REF:-main}
         CUDA_ARCH: ${CUDA_ARCH:-89}
         NEXT_PUBLIC_GAUSSIAN_DEMO: ${NEXT_PUBLIC_GAUSSIAN_DEMO:-false}
     environment:
@@ -18,6 +19,7 @@ services:
       NVIDIA_DRIVER_CAPABILITIES: compute,utility,graphics
       # Do not let Brush silently select its CPU backend when a discrete GPU is available.
       CUBECL_WGPU_DEFAULT_DEVICE: "${CUBECL_WGPU_DEFAULT_DEVICE:-DiscreteGpu(0)}"
+      SPLAT_TRANSFORM_BIN: /usr/local/bin/splat-transform
     volumes:
       - gaussian-data:/app/runtime/data
     ports:
