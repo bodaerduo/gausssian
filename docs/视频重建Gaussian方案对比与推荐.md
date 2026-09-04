@@ -45,7 +45,7 @@
 
 关键特性：
 
-- `GS_QUALITY=fast|balanced|high`：最高约 8/10/15 FPS，Brush 约 8k/15k/30k iterations，最大训练分辨率约 1200/1600/2000；默认 `balanced`。
+- 当前 API 的质量档位：快速/推荐/高质量分别为 854×480 / 1280×720 / 1920×1080 输入、2/4/6 FPS、10k/30k/50k Brush iterations；Brush 最大训练分辨率为 480/720/1080，最大 Splat 数量为 2M/5M/8M。
 - COLMAP 默认 `SIMPLE_RADIAL`、`single_camera=1`、顺序匹配窗口 20；快速移动或遮挡多时可提高 `GS_COLMAP_OVERLAP`。
 - 注册率低于 50% 直接失败；50%–80% 为警告；至少 80% 才算正常。发布前检查位置、颜色、透明度、尺度、旋转等 Gaussian 属性。
 - 浏览器负责上传、进度、历史和查看，后端通过 Node.js/TypeScript/Vite/SSE 调度本地原生引擎；可通过 `GS_ENGINE_DIR`、`GS_FFMPEG`、`GS_COLMAP`、`GS_BRUSH` 覆盖路径。

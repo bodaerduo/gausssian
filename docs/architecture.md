@@ -11,7 +11,7 @@ front（Node/vinext）
   │  GET  /api/v1/reconstructions/{id}/events（SSE）
   ▼
 backend（FastAPI + GPU Worker）
-  ├─ FFmpeg：视频缩放至最长边默认 1920 像素并抽帧、ffprobe：媒体校验
+  ├─ FFmpeg：视频按质量档位缩放至 854×480 / 1280×720 / 1920×1080 并抽帧、ffprobe：媒体校验
   ├─ COLMAP：特征提取、匹配、Mapper 稀疏重建
   └─ Brush：读取 COLMAP 数据，训练并导出 final.ply
 ```

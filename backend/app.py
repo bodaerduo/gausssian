@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 import json
 import os
 import re
@@ -22,12 +24,13 @@ from typing import Any, AsyncIterator
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel
 
 
 QUALITY = {
-    "fast": {"fps": 2, "steps": 10_000, "max_resolution": 1024, "max_splats": 2_000_000},
-    "balanced": {"fps": 4, "steps": 30_000, "max_resolution": 1600, "max_splats": 5_000_000},
-    "high": {"fps": 6, "steps": 50_000, "max_resolution": 2048, "max_splats": 8_000_000},
+    "fast": {"fps": 2, "video_width": 854, "video_height": 480, "steps": 10_000, "max_resolution": 480, "max_splats": 2_000_000},
+    "balanced": {"fps": 4, "video_width": 1280, "video_height": 720, "steps": 30_000, "max_resolution": 720, "max_splats": 5_000_000},
+    "high": {"fps": 6, "video_width": 1920, "video_height": 1080, "steps": 50_000, "max_resolution": 1080, "max_splats": 8_000_000},
 }
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".webm", ".m4v"}
@@ -55,6 +58,11 @@ os.environ.setdefault("CUBECL_WGPU_DEFAULT_DEVICE", CUBECL_WGPU_DEFAULT_DEVICE)
 MAX_UPLOAD_BYTES = env_int("GAUSSIAN_MAX_UPLOAD_BYTES", 2 * 1024 * 1024 * 1024)
 MAX_WORKERS = env_int("GAUSSIAN_MAX_WORKERS", 1)
 MATCHER = os.getenv("COLMAP_MATCHER", "exhaustive")
+
+
+class ReconstructionUpdate(BaseModel):
+    name: str | None = None
+    thumbnail: str | None = None
 
 PRODUCT_ROUTES = [
     {
@@ -344,6 +352,8 @@ def optimization_entry(job_id: str, version: int, decimate: str | None, harmonic
 
 def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name: str) -> None:
     config = QUALITY[quality_name]
+    video_width = min(config["video_width"], VIDEO_MAX_DIMENSION)
+    video_height = min(config["video_height"], VIDEO_MAX_DIMENSION)
     root = job_dir(job_id)
     dataset = root / "dataset"
     images = dataset / "images"
@@ -361,7 +371,7 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
             job_id,
             phase="FFmpeg 抽帧",
             progress=12,
-            message=f"正在将视频限制到最长边 {VIDEO_MAX_DIMENSION}px 并抽取多视角帧",
+            message=f"正在将视频限制到 {video_width}×{video_height}px 并抽取多视角帧",
         )
         run_command(
             job_id,
@@ -374,7 +384,7 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
                 "-i",
                 str(source_path),
                 "-vf",
-                f"fps={config['fps']},scale={VIDEO_MAX_DIMENSION}:{VIDEO_MAX_DIMENSION}:force_original_aspect_ratio=decrease",
+                f"fps={config['fps']},scale={video_width}:{video_height}:force_original_aspect_ratio=decrease",
                 str(images / "%06d.jpg"),
             ],
         )
@@ -390,7 +400,7 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
         raise RuntimeError(f"有效图片只有 {count} 张，至少需要 3 张")
 
     database = dataset / "database.db"
-    emit(job_id, phase="COLMAP 相机重建", progress=25, message=f"正在提取特征 · {count} 张图片")
+    emit(job_id, phase="COLMAP 机位姿与稀疏重建", progress=25, message=f"正在提取特征 · {count} 张图片")
     run_command(
         job_id,
         [COLMAP_BIN, "feature_extractor", "--database_path", str(database), "--image_path", str(images), "--ImageReader.single_camera", "1", "--FeatureExtraction.use_gpu", "1", "--FeatureExtraction.gpu_index", "0"],
@@ -400,10 +410,10 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
     if matcher_name not in {"exhaustive", "sequential"}:
         raise RuntimeError("COLMAP_MATCHER 只能是 exhaustive 或 sequential")
     matcher_command = f"{matcher_name}_matcher"
-    emit(job_id, phase="COLMAP 相机重建", progress=45, message=f"正在进行{matcher_name}匹配")
+    emit(job_id, phase="COLMAP 机位姿与稀疏重建", progress=45, message=f"正在进行{matcher_name}匹配")
     run_command(job_id, [COLMAP_BIN, matcher_command, "--database_path", str(database), "--FeatureMatching.use_gpu", "1", "--FeatureMatching.gpu_index", "0"])
 
-    emit(job_id, phase="COLMAP 相机重建", progress=65, message="正在估计相机位姿和稀疏点云")
+    emit(job_id, phase="COLMAP 机位姿与稀疏重建", progress=65, message="正在估计相机位姿和稀疏点云")
     run_command(
         job_id,
         [
@@ -914,6 +924,60 @@ def reconstruction_status(job_id: str) -> dict[str, Any]:
     if state is None:
         raise HTTPException(status_code=404, detail="任务不存在")
     return state
+
+
+@app.patch("/api/v1/reconstructions/{job_id}")
+def update_reconstruction(job_id: str, payload: ReconstructionUpdate) -> dict[str, Any]:
+    """Persist user-facing scene metadata alongside the generated model."""
+    if not valid_job_id(job_id):
+        raise HTTPException(status_code=404, detail="任务不存在")
+    lock = JOB_LOCKS.setdefault(job_id, threading.RLock())
+    with lock:
+        state = read_state(job_id)
+        if state is None:
+            raise HTTPException(status_code=404, detail="任务不存在")
+        if payload.name is not None:
+            name = payload.name.strip()
+            if not name:
+                raise HTTPException(status_code=400, detail="场景名称不能为空")
+            if len(name) > 120:
+                raise HTTPException(status_code=400, detail="场景名称不能超过 120 个字符")
+            state["display_name"] = name
+        if payload.thumbnail is not None:
+            thumbnail = payload.thumbnail.strip()
+            match = re.fullmatch(r"data:image/(?P<kind>jpeg|png|webp);base64,(?P<data>[A-Za-z0-9+/=]+)", thumbnail)
+            if match is None:
+                raise HTTPException(status_code=400, detail="封面必须是 JPEG、PNG 或 WebP 图片")
+            if len(thumbnail) > 4 * 1024 * 1024:
+                raise HTTPException(status_code=413, detail="封面图片不能超过 4 MB")
+            try:
+                image_bytes = base64.b64decode(match.group("data"), validate=True)
+            except (binascii.Error, ValueError) as exc:
+                raise HTTPException(status_code=400, detail="封面图片编码无效") from exc
+            suffix = {"jpeg": ".jpg", "png": ".png", "webp": ".webp"}[match.group("kind")]
+            thumbnail_path = job_dir(job_id) / f"thumbnail{suffix}"
+            temporary = thumbnail_path.with_suffix(f"{suffix}.tmp")
+            temporary.write_bytes(image_bytes)
+            temporary.replace(thumbnail_path)
+            state["thumbnail_file"] = thumbnail_path.name
+            state["thumbnail_media_type"] = f"image/{match.group('kind')}"
+            state["thumbnail"] = f"/api/v1/reconstructions/{job_id}/thumbnail?v={time.time_ns()}"
+        write_state(job_id, state)
+        return {"id": job_id, "display_name": state.get("display_name"), "thumbnail": state.get("thumbnail")}
+
+
+@app.get("/api/v1/reconstructions/{job_id}/thumbnail")
+def reconstruction_thumbnail(job_id: str) -> FileResponse:
+    if not valid_job_id(job_id):
+        raise HTTPException(status_code=404, detail="任务不存在")
+    state = read_state(job_id)
+    filename = state.get("thumbnail_file") if state else None
+    if not isinstance(filename, str) or Path(filename).name != filename:
+        raise HTTPException(status_code=404, detail="场景封面不存在")
+    thumbnail_path = job_dir(job_id) / filename
+    if not thumbnail_path.is_file():
+        raise HTTPException(status_code=404, detail="场景封面不存在")
+    return FileResponse(thumbnail_path, media_type=state.get("thumbnail_media_type", "image/jpeg"), headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
 
 @app.get("/api/v1/reconstructions/{job_id}/events")
