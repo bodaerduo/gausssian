@@ -22,9 +22,20 @@ services:
       SPLAT_TRANSFORM_BIN: /usr/local/bin/splat-transform
     volumes:
       - gaussian-data:/app/runtime/data
-    ports:
-      - "${HTTP_PORT:-8080}:4177"
+    expose:
+      - "4177"
     runtime: nvidia
+    restart: unless-stopped
+
+  nginx:
+    image: harbor.djicorp.com/es310/public/nginx:1.26.1
+    depends_on:
+      - backend
+    ports:
+      - "${HTTPS_PORT:-8080}:443"
+    volumes:
+      - ${GAUSSIAN_TLS_DIR:-../runtime/tls}:/etc/nginx/tls:ro
+      - ./nginx-https.conf:/etc/nginx/conf.d/default.conf:ro
     restart: unless-stopped
 
 volumes:

@@ -32,6 +32,8 @@ APP_DIR="$PWD" ./scripts/setup-supersplat-ubuntu.sh
 代码更新和容器重启继续使用 `scripts/update-and-restart-ready.sh`。GPU 容器部署入口为：
 
 ```bash
+chmod +x scripts/setup-self-signed-https.sh
+TLS_IP=192.168.2.11 ./scripts/setup-self-signed-https.sh
 docker compose -p gaussian -f docker/compose.yml up -d --build
 ```
 
@@ -41,6 +43,10 @@ docker compose -p gaussian -f docker/compose.yml up -d --build
 - [`docs/architecture.md`](./docs/architecture.md)
 - [`docs/folder-layout.md`](./docs/folder-layout.md)
 - [`docs/视频重建Gaussian方案对比与推荐.md`](./docs/视频重建Gaussian方案对比与推荐.md)
+- [`docs/abot-streaming-scan-plan.md`](./docs/abot-streaming-scan-plan.md)
+- [`docs/manual-abot-recon-container-build.md`](./docs/manual-abot-recon-container-build.md)：基于现有 CUDA 12.4 devel 镜像手动安装 ABot-Recon Worker 依赖。
+
+如需让局域网浏览器通过 HTTPS 使用 SuperSplat WebGPU 编辑器，可执行 `TLS_IP=192.168.2.11 ./scripts/setup-self-signed-https.sh`，再启动 `docker/compose.yml`；具体步骤见 [`docs/container-deployment.md`](./docs/container-deployment.md)。
 
 当前服务器已有 CUDA 12.4.1 runtime 镜像时，容器部署入口为：
 

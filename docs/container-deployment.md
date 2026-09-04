@@ -4,7 +4,7 @@
 
 当前服务器宿主机 APT 存在依赖版本混杂，直接安装 COLMAP 编译依赖会失败。容器将 Python、FFmpeg、COLMAP、Brush 和 Node 依赖隔离在一个镜像内，避免继续修改宿主机用户态包。
 
-运行时只有一个容器：FastAPI、GPU Worker 和 vinext 前端都在同一容器中；前端通过同源 rewrite 转发 `/api/*` 到容器内的 FastAPI，不需要 Nginx。
+运行时由应用容器和 Nginx HTTPS 代理组成：FastAPI、GPU Worker 和 vinext 前端在应用容器中运行；Nginx 对外提供自签名 HTTPS，并将请求转发到应用容器。
 
 ## 已有 CUDA 镜像
 
@@ -40,6 +40,8 @@ docker run --rm --gpus all \
 在项目根目录执行：
 
 ```bash
+chmod +x scripts/setup-self-signed-https.sh
+TLS_IP=192.168.2.11 ./scripts/setup-self-signed-https.sh
 docker compose -p gaussian -f docker/compose.yml up -d --build
 ```
 
@@ -52,8 +54,12 @@ Dockerfile 已启用 APT、Cargo 和 npm 缓存，并将 COLMAP/Brush 源码下�
 访问地址：
 
 ```text
-http://服务器地址:8080/
+https://192.168.2.11:8080/
 ```
+
+### 局域网 HTTPS（自签名证书）
+
+上面的启动命令已启用 HTTPS。访问 `https://192.168.2.11:8080/` 时，首次需要在浏览器中接受自签名证书警告。证书文件位于 `runtime/tls/`，不要提交私钥；更换 IP 时重新执行脚本并设置新的 `TLS_IP`。
 
 API 健康检查：
 
@@ -69,7 +75,7 @@ docker compose -p gaussian -f docker/compose.yml logs -f backend
 - `CUDA_ARCH=89`：RTX 4090 对应架构；换 GPU 时按实际算力调整。
 - `COLMAP_REF=main`：COLMAP 分支或 tag，生产环境建议固定 tag/commit。
 - `BRUSH_REF=main`：Brush 分支或 tag，生产环境建议固定 tag/commit。
-- `HTTP_PORT=8080`：容器唯一对外端口；如果被占用可改成 `18080`。
+- `HTTPS_PORT=8080`：Nginx 唯一对外 HTTPS 端口；如果被占用可改成 `18080`。
 - `GAUSSIAN_MAX_WORKERS=1`：单张 RTX 4090 建议保持 1，避免任务抢占显存。
 
 ## 隔离边界
@@ -81,3 +87,29 @@ docker compose -p gaussian -f docker/compose.yml logs -f backend
 - `docker compose down` 只应在确认项目名为 `gaussian` 时使用。
 
 首次安装 NVIDIA Container Toolkit 或修改 Docker runtime 仍属于宿主机级变更，可能需要重启 Docker daemon；这一步可能短暂影响其它容器。
+
+## ABot-Recon POC 独立容器
+
+ABot-Recon 不安装进现有 `backend` 镜像。使用额外的 Compose 覆盖文件启动独立 GPU Worker：
+
+如果服务器已经有 CUDA 12.4 devel 基础镜像，需要先手动补齐依赖并验收，可参考[手动安装 ABot-Recon Worker](./manual-abot-recon-container-build.md)。
+
+```bash
+docker compose -p gaussian -f docker/compose.yml -f docker/compose-abot.yml up -d --build
+```
+
+该覆盖文件只新增 `abot-worker`，并给主 API 注入 `ABOT_RECON_URL=http://abot-worker:8091`；现有 Brush/COLMAP 容器仍使用原来的 CUDA 12.4 镜像和生产命令。两个容器共享 `gaussian-data`，因此 Worker 可以读取主 API 保存的视频，并把 `preview/*.ply` 写回同一个任务目录，但 Python、PyTorch 和 CUDA 用户态库完全隔离。
+
+首次构建会安装 ABot-Recon 的独立环境（PyTorch 2.5.1 + cu121），并在第一次任务时从 Hugging Face 缓存模型权重。若服务器不能访问 Hugging Face，可通过 `ABOT_RECON_MODEL` 指向已经挂载到 Worker 的本地模型目录。
+
+### POC 验收
+
+```bash
+docker compose -p gaussian -f docker/compose.yml -f docker/compose-abot.yml ps
+docker compose -p gaussian -f docker/compose.yml -f docker/compose-abot.yml logs -f abot-worker
+curl -f http://127.0.0.1:${ABOT_RECON_PORT:-8091}/health
+```
+
+浏览器进入“流式扫描”，上传视频后点击“开始扫描”（当前 POC 固定走 ABot 路线）。视频保留在 `gaussian-data`，主 API 通过 Worker HTTP 接口轮询进度并继续向浏览器发送 SSE；ABot 失败不会覆盖 `output/final.ply`。
+
+单卡机器首版保持主 API 和 ABot Worker 串行运行，不要把 `GAUSSIAN_MAX_WORKERS` 调大；如果 Brush 正在训练，ABot 任务应等待显存释放。

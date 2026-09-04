@@ -11,6 +11,8 @@ import subprocess
 import threading
 import time
 import uuid
+import urllib.error
+import urllib.request
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -95,6 +97,15 @@ def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def elapsed_seconds(start: str | None, end: str | None) -> float | None:
+    if not start or not end:
+        return None
+    try:
+        return max(0.0, (datetime.fromisoformat(end) - datetime.fromisoformat(start)).total_seconds())
+    except (TypeError, ValueError):
+        return None
+
+
 def job_dir(job_id: str) -> Path:
     return DATA_ROOT / "jobs" / job_id
 
@@ -136,6 +147,15 @@ def emit(job_id: str, *, event_type: str = "progress", phase: str, progress: int
     lock = JOB_LOCKS[job_id]
     with lock:
         state = read_state(job_id) or {"id": job_id}
+        timestamp = now()
+        previous_phase = state.get("phase")
+        previous_started = state.get("phase_started_at")
+        stage_durations = dict(state.get("stage_durations") or {})
+        if previous_phase and previous_phase != phase:
+            duration = elapsed_seconds(previous_started, timestamp)
+            if duration is not None:
+                stage_durations[previous_phase] = round(duration, 1)
+        phase_started_at = previous_started if previous_phase == phase else timestamp
         status = state.get("status", "processing")
         if event_type == "completed":
             status = "completed"
@@ -143,7 +163,17 @@ def emit(job_id: str, *, event_type: str = "progress", phase: str, progress: int
             status = "failed"
         elif status == "queued":
             status = "processing"
-        state.update({"status": status, "phase": phase, "progress": progress, "message": message, **extra})
+        state.update({"status": status, "phase": phase, "progress": progress, "message": message, "phase_started_at": phase_started_at, "stage_durations": stage_durations, **extra})
+        if event_type in TERMINAL_STATUSES:
+            if previous_phase == phase:
+                duration = elapsed_seconds(previous_started, timestamp)
+                if duration is not None:
+                    stage_durations[phase] = round(duration, 1)
+            state["stage_durations"] = stage_durations
+            state["finished_at"] = timestamp
+            total = elapsed_seconds(state.get("created_at"), timestamp)
+            if total is not None:
+                state["total_duration_seconds"] = round(total, 1)
         event = {"type": event_type, "id": job_id, "phase": phase, "progress": progress, "message": message, **extra}
         with events_path(job_id).open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(event, ensure_ascii=False) + "\n")
@@ -446,9 +476,110 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
     )
 
 
-def worker_entry(job_id: str, source_kind: str, source_path: Path, quality_name: str) -> None:
+def run_addon_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name: str, route: str) -> None:
+    """Run an optional external worker without importing its Python environment."""
+    route_name = next(item["name"] for item in PRODUCT_ROUTES if item["id"] == route)
+    preview_dir = job_dir(job_id) / "preview"
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = job_dir(job_id) / "products" / route
+    output_dir.mkdir(parents=True, exist_ok=True)
+    emit(job_id, phase=f"{route_name} POC", progress=8, message=f"已进入 {route_name} 独立 Worker 适配层")
+    command_key = "ABOT_RECON_CMD" if route == "abot_recon_poc" else "LINGBOT_MAP_CMD"
+    service_key = "ABOT_RECON_URL" if route == "abot_recon_poc" else "LINGBOT_MAP_URL"
+    service_url = os.getenv(service_key, "").strip().rstrip("/")
+    if service_url:
+        run_remote_addon_pipeline(job_id, source_kind, source_path, quality_name, route, service_url, output_dir, preview_dir)
+        return
+    command_template = os.getenv(command_key, "").strip()
+    if not command_template:
+        raise RuntimeError(f"{route_name} Worker 尚未安装或配置（请设置 {command_key}）；标准 Brush 路线不受影响")
+    command = command_template.format(
+        job_id=job_id,
+        source=str(source_path),
+        output=str(output_dir),
+        preview=str(preview_dir),
+        quality=quality_name,
+    )
+    append_log(job_id, f"\n[{route_name}] 启动外部 Worker：{command}\n")
+    process = subprocess.Popen(
+        shlex.split(command),
+        cwd=str(PROJECT_ROOT),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    assert process.stdout is not None
+    for line in process.stdout:
+        append_log(job_id, line)
+        emit(job_id, phase=f"{route_name} POC", progress=20, message=line.strip()[:240] or "Worker 运行中")
+    return_code = process.wait()
+    if return_code != 0:
+        raise RuntimeError(f"{route_name} Worker 退出码 {return_code}")
+    emit(job_id, event_type="completed", phase=f"{route_name} POC", progress=100, message="预览资产已写入独立产物目录", route=route, asset_type="pointcloud_preview", preview_url=f"/api/v1/reconstructions/{job_id}/preview")
+
+
+def json_http(url: str, *, method: str = "GET", payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    body = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    request = urllib.request.Request(url, data=body, method=method, headers={"Content-Type": "application/json"})
     try:
-        run_pipeline(job_id, source_kind, source_path, quality_name)
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Worker API 请求失败：{url}") from exc
+
+
+def run_remote_addon_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name: str, route: str, service_url: str, output_dir: Path, preview_dir: Path) -> None:
+    route_name = next(item["name"] for item in PRODUCT_ROUTES if item["id"] == route)
+    submitted = json_http(
+        f"{service_url}/v1/jobs",
+        method="POST",
+        payload={
+            "job_id": job_id,
+            "source_kind": source_kind,
+            "source_path": str(source_path),
+            "output_dir": str(output_dir),
+            "preview_dir": str(preview_dir),
+            "quality": quality_name,
+        },
+    )
+    worker_job_id = str(submitted.get("id", ""))
+    if not worker_job_id:
+        raise RuntimeError(f"{route_name} Worker 未返回任务 ID")
+    event_index = 0
+    while True:
+        status = json_http(f"{service_url}/v1/jobs/{worker_job_id}")
+        events = status.get("events", [])
+        for event in events[event_index:]:
+            event_index += 1
+            emit(
+                job_id,
+                phase=f"{route_name} POC",
+                progress=max(8, min(98, int(event.get("progress", 20)))),
+                message=str(event.get("message", "Worker 运行中"))[:240],
+                route=route,
+                asset_type="pointcloud_preview",
+                frame=event.get("frame"),
+                point_count=event.get("point_count"),
+                confidence=event.get("confidence"),
+                preview_url=event.get("preview_url"),
+            )
+        state = status.get("status")
+        if state == "completed":
+            emit(job_id, event_type="completed", phase=f"{route_name} POC", progress=100, message="预览资产已写入独立产物目录", route=route, asset_type="pointcloud_preview", preview_url=f"/api/v1/reconstructions/{job_id}/preview")
+            return
+        if state == "failed":
+            raise RuntimeError(str(status.get("error") or f"{route_name} Worker 失败"))
+        time.sleep(0.75)
+
+
+def worker_entry(job_id: str, source_kind: str, source_path: Path, quality_name: str, route: str = "brush_static") -> None:
+    try:
+        if route == "brush_static":
+            run_pipeline(job_id, source_kind, source_path, quality_name)
+        else:
+            run_addon_pipeline(job_id, source_kind, source_path, quality_name, route)
     except Exception as exc:  # noqa: BLE001 - boundary for background jobs
         append_log(job_id, f"\nERROR: {exc}\n")
         emit(job_id, event_type="failed", phase="失败", progress=0, message=str(exc))
@@ -493,14 +624,25 @@ def products() -> dict[str, list[dict[str, Any]]]:
     return {"products": PRODUCT_ROUTES}
 
 
+def product_route(route_id: str) -> dict[str, Any]:
+    route = next((item for item in PRODUCT_ROUTES if item["id"] == route_id), None)
+    if route is None:
+        raise HTTPException(status_code=400, detail=f"不支持的产品路线：{route_id}")
+    if not route["enabled"]:
+        raise HTTPException(status_code=409, detail=f"产品路线 {route['name']} 尚未启用 GPU Worker")
+    return route
+
+
 @app.post("/api/v1/reconstructions", status_code=202)
 async def create_reconstruction(
     videos: UploadFile | None = File(default=None),
     images: list[UploadFile] | None = File(default=None),
     quality: str = Form(default="balanced"),
+    route: str = Form(default="brush_static"),
 ) -> dict[str, Any]:
     if quality not in QUALITY:
         raise HTTPException(status_code=400, detail=f"quality 必须是：{', '.join(QUALITY)}")
+    selected_route = product_route(route)
     image_uploads = images or []
     has_video = videos is not None and bool(videos.filename)
     has_images = bool(image_uploads)
@@ -515,9 +657,10 @@ async def create_reconstruction(
     root = job_dir(job_id)
     root.mkdir(parents=True, exist_ok=False)
     JOB_LOCKS[job_id] = threading.RLock()
-    state = {"id": job_id, "status": "queued", "progress": 0, "phase": "素材检查", "message": "任务已排队", "quality": quality, "created_at": now(), "updated_at": now()}
+    created_at = now()
+    state = {"id": job_id, "status": "queued", "progress": 0, "phase": "素材检查", "message": "任务已排队", "quality": quality, "route": selected_route["id"], "asset_type": selected_route["asset_type"], "created_at": created_at, "updated_at": created_at, "phase_started_at": created_at, "stage_durations": {}}
     state_path(job_id).write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
-    events_path(job_id).write_text(json.dumps({"type": "queued", "id": job_id, "phase": "素材检查", "progress": 0, "message": "任务已排队"}, ensure_ascii=False) + "\n", encoding="utf-8")
+    events_path(job_id).write_text(json.dumps({"type": "queued", "id": job_id, "route": selected_route["id"], "asset_type": selected_route["asset_type"], "phase": "素材检查", "progress": 0, "message": "任务已排队"}, ensure_ascii=False) + "\n", encoding="utf-8")
 
     total = 0
     try:
@@ -542,8 +685,8 @@ async def create_reconstruction(
         JOB_LOCKS.pop(job_id, None)
         raise
 
-    EXECUTOR.submit(worker_entry, job_id, source_kind, source_path, quality)
-    return {"id": job_id, "status": "queued", "events_url": f"/api/v1/reconstructions/{job_id}/events", "download_url": f"/api/v1/reconstructions/{job_id}/download"}
+    EXECUTOR.submit(worker_entry, job_id, source_kind, source_path, quality, selected_route["id"])
+    return {"id": job_id, "status": "queued", "route": selected_route["id"], "asset_type": selected_route["asset_type"], "events_url": f"/api/v1/reconstructions/{job_id}/events", "download_url": f"/api/v1/reconstructions/{job_id}/download"}
 
 
 @app.get("/api/v1/reconstructions")
@@ -560,6 +703,37 @@ def list_reconstructions() -> dict[str, list[dict[str, Any]]]:
                 jobs.append(state)
     jobs.sort(key=lambda item: item.get("created_at", ""), reverse=True)
     return {"jobs": jobs}
+
+
+@app.get("/api/v1/reconstructions/{job_id}/preview")
+def list_preview_assets(job_id: str) -> dict[str, Any]:
+    """List additive point-cloud/video preview assets produced by optional workers."""
+    if not valid_job_id(job_id) or read_state(job_id) is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    preview_dir = job_dir(job_id) / "preview"
+    assets = []
+    if preview_dir.exists():
+        for path in sorted(preview_dir.iterdir()):
+            if path.is_file() and path.name != "state.json":
+                assets.append({
+                    "name": path.name,
+                    "bytes": path.stat().st_size,
+                    "url": f"/api/v1/reconstructions/{job_id}/preview/{path.name}",
+                })
+    return {"id": job_id, "route": (read_state(job_id) or {}).get("route"), "assets": assets}
+
+
+@app.get("/api/v1/reconstructions/{job_id}/preview/{filename}")
+def download_preview_asset(job_id: str, filename: str) -> FileResponse:
+    if not valid_job_id(job_id) or read_state(job_id) is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    safe_name = Path(filename).name
+    if safe_name != filename or filename in {"", ".", ".."}:
+        raise HTTPException(status_code=400, detail="非法预览文件名")
+    path = job_dir(job_id) / "preview" / safe_name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="预览资产不存在")
+    return FileResponse(path, media_type="application/octet-stream", filename=safe_name)
 
 
 @app.post("/api/v1/reconstructions/import", status_code=201)
