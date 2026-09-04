@@ -1181,6 +1181,12 @@ body { font-family: "Fira Sans", Inter, "PingFang SC", "Microsoft YaHei", ui-san
 .eagle-avatar { transform: translateX(-50%) scale(1.5) rotateY(var(--eagle-yaw, 0deg)) rotateZ(var(--eagle-bank, 0deg)); }
 @media (max-width: 700px) { .eagle-avatar { bottom: -1px; width: 132px; height: 132px; transform: translateX(-50%) scale(1.5) rotateY(var(--eagle-yaw, 0deg)) rotateZ(var(--eagle-bank, 0deg)); } }
 
+/* Circular translucent controls: QWER / ASDF arranged like a compact flight keypad. */
+.virtual-keyboard { padding: 8px 10px; border: 1px solid rgba(255, 255, 255, .24); border-radius: 28px; background: rgba(8, 24, 45, .28); box-shadow: inset 0 1px rgba(255, 255, 255, .16), 0 8px 22px rgba(0, 0, 0, .16); backdrop-filter: blur(8px); }
+.virtual-key { width: 38px; min-width: 38px; height: 38px; padding: 0; border-radius: 50%; }
+.key-row-wide .virtual-key { width: 100%; height: 32px; min-height: 32px; border-radius: 18px; }
+@media (max-width: 700px) { .virtual-key { width: 34px; min-width: 34px; height: 34px; } }
+
 /* Detail view contrast: the scene stays dark, while its surrounding metadata remains readable. */
 .model-detail { border-color: #c7d7e6 !important; background: #ffffff !important; color: #12345b !important; }
 .model-detail .detail-heading h2, .model-detail .detail-stats strong { color: #12345b !important; }
