@@ -1076,6 +1076,35 @@ body { font-family: "Fira Sans", Inter, "PingFang SC", "Microsoft YaHei", ui-san
 .speed-control output { min-width: 28px; color: rgba(255, 255, 255, .9); font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; }
 @media (max-width: 700px) { .roam-cockpit { right: auto !important; bottom: 12px !important; left: 50% !important; } .roam-cockpit .roam-controls { gap: 10px; } .speed-control { display: flex !important; } }
 
+/* Flight HUD: eagle avatar stays centered while the keyboard remains in the lower-left corner. */
+.roam-cockpit { right: auto !important; bottom: 18px !important; left: 18px !important; width: max-content !important; max-width: calc(100vw - 36px); transform: none !important; }
+.roam-cockpit .roam-controls { gap: 12px; }
+.speed-control { display: grid !important; gap: 2px; min-width: 92px; padding: 7px 9px; border: 1px solid rgba(255, 255, 255, .3); border-radius: 8px; color: rgba(255, 255, 255, .9) !important; background: rgba(7, 20, 47, .42) !important; }
+.speed-control span { font-size: 8px; letter-spacing: .12em; text-transform: uppercase; }
+.speed-control strong { color: #7de2cf; font-size: 12px; }
+.speed-control small { color: rgba(255, 255, 255, .68); font-size: 8px; }
+.eagle-avatar { position: absolute; z-index: 4; bottom: 18px; left: 50%; width: 170px; height: 142px; transform: translateX(-50%) rotate(var(--eagle-bank, 0deg)); transform-origin: 50% 100%; pointer-events: none; filter: drop-shadow(0 12px 14px rgba(0, 0, 0, .35)); transition: transform .18s ease-out; }
+.eagle-avatar svg { width: 100%; height: 100%; overflow: visible; }
+.eagle-head, .eagle-neck { fill: #f7fafc; stroke: #b9cce0; stroke-width: 2; }
+.eagle-crown { fill: #ffffff; stroke: #c7d8e8; stroke-width: 1.5; }
+.eagle-wing { fill: #d5e2ef; stroke: #91aac0; stroke-width: 2; transform-box: fill-box; transform-origin: center; }
+.eagle-beak { fill: #e5a93a; stroke: #a86c16; stroke-width: 1.5; }
+.eagle-eye { fill: #12263d; stroke: #ffffff; stroke-width: 1.5; }
+.eagle-feather { fill: none; stroke: #90a7bd; stroke-width: 2; stroke-linecap: round; opacity: .85; }
+.eagle-avatar[data-moving='true'] svg { animation: eagle-flight var(--eagle-flight-rate, .72s) ease-in-out infinite alternate; }
+.eagle-avatar[data-moving='true'] .eagle-wing-left { animation: eagle-wing-left var(--eagle-flight-rate, .72s) ease-in-out infinite alternate; }
+.eagle-avatar[data-moving='true'] .eagle-wing-right { animation: eagle-wing-right var(--eagle-flight-rate, .72s) ease-in-out infinite alternate; }
+.eagle-avatar.eagle-speed-0 { --eagle-flight-rate: 1.2s; }
+.eagle-avatar.eagle-speed-1 { --eagle-flight-rate: .78s; }
+.eagle-avatar.eagle-speed-2 { --eagle-flight-rate: .42s; }
+.eagle-avatar[data-turn='left'] { --eagle-bank: -12deg; }
+.eagle-avatar[data-turn='right'] { --eagle-bank: 12deg; }
+@keyframes eagle-flight { from { translate: 0 1px; } to { translate: 0 -5px; } }
+@keyframes eagle-wing-left { from { rotate: -4deg; } to { rotate: 7deg; } }
+@keyframes eagle-wing-right { from { rotate: 4deg; } to { rotate: -7deg; } }
+@media (max-width: 700px) { .roam-cockpit { right: auto !important; bottom: 12px !important; left: 12px !important; max-width: calc(100vw - 24px); } .roam-cockpit .roam-controls { gap: 8px; } .eagle-avatar { bottom: 14px; width: 132px; height: 110px; } }
+@media (prefers-reduced-motion: reduce) { .eagle-avatar[data-moving='true'] svg, .eagle-avatar[data-moving='true'] .eagle-wing-left, .eagle-avatar[data-moving='true'] .eagle-wing-right { animation: none; } }
+
 /* Detail view contrast: the scene stays dark, while its surrounding metadata remains readable. */
 .model-detail { border-color: #c7d7e6 !important; background: #ffffff !important; color: #12345b !important; }
 .model-detail .detail-heading h2, .model-detail .detail-stats strong { color: #12345b !important; }

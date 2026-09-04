@@ -19,17 +19,28 @@ type GaussianSplatsModule = {
 export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string; modelName: string; onClose: () => void }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const keysRef = useRef(new Set<string>());
-  const speedRef = useRef(1);
+  const speedValues = [0.72, 1.2, 2.1];
+  const speedLabels = ['低速', '中速', '高速'];
+  const speedRef = useRef(speedValues[1]);
   const jumpVelocityRef = useRef(0);
   const groundedRef = useRef(true);
   const jumpingRef = useRef(false);
   const [loaded, setLoaded] = useState(false);
-  const [speed, setSpeed] = useState(1);
+  const [speedLevel, setSpeedLevel] = useState(1);
   const [error, setError] = useState('');
   const [pressedKeys, setPressedKeys] = useState<string[]>([]);
   const recenterRef = useRef<(clientX: number, clientY: number) => void>(() => undefined);
+  const eagleRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef(onClose);
   useEffect(() => { closeRef.current = onClose; }, [onClose]);
+
+  const cycleSpeed = () => {
+    setSpeedLevel((current) => {
+      const next = (current + 1) % speedValues.length;
+      speedRef.current = speedValues[next];
+      return next;
+    });
+  };
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -99,6 +110,7 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
           const key = normalizeKey(event);
           keysRef.current.add(key);
           setPressedKeys((current) => current.includes(key) ? current : [...current, key]);
+          if (key === 'shift' && !event.repeat) cycleSpeed();
           if (key === 'escape') closeRef.current();
           if (key === ' ' && groundedRef.current) {
             jumpVelocityRef.current = 4.4;
@@ -132,7 +144,7 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
           const dt = Math.min((now - previous) / 1000, 0.05);
           previous = now;
           const keys = keysRef.current;
-          const move = 2.2 * (keys.has('shift') ? 2.4 : 1) * speedRef.current;
+          const move = 2.2 * speedRef.current;
           const verticalMove = move * 4;
           if (keys.has('q')) yaw -= 1.8 * dt;
           if (keys.has('e')) yaw += 1.8 * dt;
@@ -145,6 +157,13 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
           if (keys.has('d') || keys.has('arrowright')) velocity.addScaledVector(right, move);
           playerPosition.addScaledVector(velocity, dt);
           const verticalInput = (keys.has('r') ? 1 : 0) - (keys.has('f') ? 1 : 0);
+          const turnInput = (keys.has('e') ? 1 : 0) - (keys.has('q') ? 1 : 0);
+          const eagle = eagleRef.current;
+          if (eagle) {
+            eagle.dataset.moving = velocity.lengthSq() > 0.01 || turnInput !== 0 || verticalInput !== 0 ? 'true' : 'false';
+            eagle.dataset.turn = turnInput < 0 ? 'left' : turnInput > 0 ? 'right' : 'none';
+            eagle.style.setProperty('--eagle-bank', `${turnInput * 12}deg`);
+          }
           if (verticalInput !== 0) {
             playerPosition.y = Math.max(1.15, playerPosition.y + verticalInput * verticalMove * dt);
             jumpVelocityRef.current = 0;
@@ -213,8 +232,10 @@ export function RoamViewer({ modelUrl, modelName, onClose }: { modelUrl: string;
       });
       mount.replaceChildren();
     };
+  // The listener lifetime follows the loaded model; cycleSpeed is stable for this interaction handler.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelUrl]);
 
-  const virtualKey = (key: string, label = key.toUpperCase()) => <button className={pressedKeys.includes(key) ? 'virtual-key pressed' : 'virtual-key'} type="button" aria-label={`按住 ${label}`} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); keysRef.current.add(key); setPressedKeys((current) => current.includes(key) ? current : [...current, key]); if (key === ' ' && groundedRef.current) { jumpVelocityRef.current = 4.4; groundedRef.current = false; jumpingRef.current = true; } }} onPointerUp={() => { keysRef.current.delete(key); setPressedKeys((current) => current.filter((value) => value !== key)); }} onPointerCancel={() => { keysRef.current.delete(key); setPressedKeys((current) => current.filter((value) => value !== key)); }}>{label}</button>;
-  return <div className="roam-overlay" role="dialog" aria-modal="true" aria-label={`${modelName} 漫游模式`}><div className="roam-shell"><div className="roam-canvas"><div className="roam-engine" ref={mountRef} /><div className="roam-crosshair" /><div className="roam-status"><span className={loaded ? 'status-pip' : 'status-pip amber'} />{error ? error : loaded ? '真实 PLY 场景已载入' : '正在加载真实 Gaussian 场景…'}</div></div><div className="roam-cockpit"><div className="roam-controls"><div className="virtual-keyboard"><div className="key-row">{virtualKey('q')} {virtualKey('w')} {virtualKey('e')} {virtualKey('r', 'R ↑')}</div><div className="key-row">{virtualKey('a')} {virtualKey('s')} {virtualKey('d')} {virtualKey('f', 'F ↓')}</div><div className="key-row key-row-wide">{virtualKey(' ', 'SPACE')}</div></div><label className="speed-control" aria-label="调整漫游速度">速度 <input type="range" min="0.6" max="2" step="0.1" value={speed} onChange={(event) => { const next = Number(event.target.value); speedRef.current = next; setSpeed(next); }} /><output>{speed.toFixed(1)}×</output></label></div></div></div></div>;
+  const virtualKey = (key: string, label = key.toUpperCase()) => <button className={pressedKeys.includes(key) ? 'virtual-key pressed' : 'virtual-key'} type="button" aria-label={key === 'shift' ? '点击切换速度' : `按住 ${label}`} onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); if (key === 'shift') cycleSpeed(); keysRef.current.add(key); setPressedKeys((current) => current.includes(key) ? current : [...current, key]); if (key === ' ' && groundedRef.current) { jumpVelocityRef.current = 4.4; groundedRef.current = false; jumpingRef.current = true; } }} onPointerUp={() => { keysRef.current.delete(key); setPressedKeys((current) => current.filter((value) => value !== key)); }} onPointerCancel={() => { keysRef.current.delete(key); setPressedKeys((current) => current.filter((value) => value !== key)); }}>{label}</button>;
+  return <div className="roam-overlay" role="dialog" aria-modal="true" aria-label={`${modelName} 漫游模式`}><div className="roam-shell"><div className="roam-canvas"><div className="roam-engine" ref={mountRef} /><div className="roam-crosshair" /><div ref={eagleRef} className={`eagle-avatar eagle-speed-${speedLevel}`} data-moving="false" data-turn="none" aria-hidden="true"><svg viewBox="0 0 180 150" role="img" aria-label="飞行中的老鹰"><path className="eagle-wing eagle-wing-left" d="M28 71 4 55l22 4 13-17 9 21 18-8-8 22-16 11Z" /><path className="eagle-wing eagle-wing-right" d="m152 71 24-16-22 4-13-17-9 21-18-8 8 22 16 11Z" /><path className="eagle-neck" d="M55 96c3-26 17-45 35-48 18 3 32 22 35 48l-14 40H69Z" /><path className="eagle-head" d="M50 63c0-24 17-40 40-40s40 16 40 40c0 20-14 33-40 33S50 83 50 63Z" /><path className="eagle-crown" d="M57 47c7-19 19-29 33-29s26 10 33 29c-11-8-22-11-33-8-11-3-22 0-33 8Z" /><path className="eagle-beak" d="m126 61 26 8-22 13-11-8Z" /><circle className="eagle-eye" cx="112" cy="56" r="3.5" /><path className="eagle-feather" d="M71 100c4 13 9 22 15 29M84 98c2 16 4 25 8 32M97 98c-2 16-4 25-8 32M110 100c-4 13-9 22-15 29" /></svg></div><div className="roam-status"><span className={loaded ? 'status-pip' : 'status-pip amber'} />{error ? error : loaded ? '真实 PLY 场景已载入' : '正在加载真实 Gaussian 场景…'}</div></div><div className="roam-cockpit"><div className="roam-controls"><div className="virtual-keyboard"><div className="key-row">{virtualKey('w')} {virtualKey('a')} {virtualKey('s')} {virtualKey('d')}</div><div className="key-row">{virtualKey('q')} {virtualKey('e')} {virtualKey('r')} {virtualKey('f')}</div><div className="key-row key-row-wide">{virtualKey('shift', 'SHIFT')}</div></div><div className="speed-control" aria-live="polite"><span>速度</span><strong>{speedLabels[speedLevel]}</strong><small>点击 SHIFT 切换</small></div></div></div></div></div>;
 }
