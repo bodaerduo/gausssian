@@ -200,6 +200,8 @@ h2 { margin: 0; color: var(--ink); font-size: 13px; font-weight: 760; letter-spa
 .product-routes-page { min-height: 100vh; padding: 54px clamp(22px, 5vw, 86px); color: var(--ink); background: radial-gradient(circle at 15% 0%, rgba(61, 224, 202, .12), transparent 34%), radial-gradient(circle at 92% 8%, rgba(117, 103, 248, .12), transparent 32%), #f7f9fc; }
 .route-link { padding: 7px 10px; border: 1px solid rgba(117, 103, 248, .24); border-radius: 7px; color: var(--violet); background: rgba(244, 241, 255, .75); font-size: 10px; text-decoration: none; transition: border-color .2s, transform .2s; }
 .route-link:hover { border-color: rgba(117, 103, 248, .55); transform: translateY(-1px); }
+.route-launch { color: var(--violet); font-size: 10px; font-weight: 700; text-decoration: none; }
+.route-launch:hover { text-decoration: underline; }
 .product-routes-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 28px; max-width: 1320px; margin: 0 auto 38px; }
 .product-routes-header h1 { margin: 8px 0 10px; font-size: clamp(32px, 5vw, 60px); letter-spacing: -.06em; }
 .product-routes-header p { max-width: 620px; margin: 0; color: var(--ink-faint); font-size: 13px; }
@@ -1104,6 +1106,18 @@ body { font-family: "Fira Sans", Inter, "PingFang SC", "Microsoft YaHei", ui-san
 @keyframes eagle-wing-right { from { rotate: 4deg; } to { rotate: -7deg; } }
 @media (max-width: 700px) { .roam-cockpit { right: auto !important; bottom: 12px !important; left: 12px !important; max-width: calc(100vw - 24px); } .roam-cockpit .roam-controls { gap: 8px; } .eagle-avatar { bottom: 14px; width: 132px; height: 110px; } }
 @media (prefers-reduced-motion: reduce) { .eagle-avatar[data-moving='true'] svg, .eagle-avatar[data-moving='true'] .eagle-wing-left, .eagle-avatar[data-moving='true'] .eagle-wing-right { animation: none; } }
+
+/* Real eagle cutout: forward flight, then distinct banking gestures for Q/E turns. */
+.eagle-avatar img { display: block; width: 100%; height: 100%; object-fit: contain; transform-origin: 50% 100%; }
+.eagle-avatar[data-moving='true'] img { animation: eagle-flight var(--eagle-flight-rate, .78s) ease-in-out infinite alternate; }
+.eagle-avatar[data-moving='true'][data-turn='left'] img { animation: eagle-flight var(--eagle-flight-rate, .78s) ease-in-out infinite alternate, eagle-turn-left .42s ease-out; }
+.eagle-avatar[data-moving='true'][data-turn='right'] img { animation: eagle-flight var(--eagle-flight-rate, .78s) ease-in-out infinite alternate, eagle-turn-right .42s ease-out; }
+.eagle-avatar[data-turn='left'] { --eagle-bank: -13deg; }
+.eagle-avatar[data-turn='right'] { --eagle-bank: 13deg; }
+@keyframes eagle-flight { from { transform: translateY(2px) scale(.985); } to { transform: translateY(-5px) scale(1); } }
+@keyframes eagle-turn-left { 0% { rotate: 0deg; translate: 0 0; } 55% { rotate: -8deg; translate: -6px -1px; } 100% { rotate: -4deg; translate: -3px 0; } }
+@keyframes eagle-turn-right { 0% { rotate: 0deg; translate: 0 0; } 55% { rotate: 8deg; translate: 6px -1px; } 100% { rotate: 4deg; translate: 3px 0; } }
+@media (prefers-reduced-motion: reduce) { .eagle-avatar[data-moving='true'] img { animation: none; } }
 
 /* Detail view contrast: the scene stays dark, while its surrounding metadata remains readable. */
 .model-detail { border-color: #c7d7e6 !important; background: #ffffff !important; color: #12345b !important; }
