@@ -1169,7 +1169,7 @@ body { font-family: "Fira Sans", Inter, "PingFang SC", "Microsoft YaHei", ui-san
 @media (prefers-reduced-motion: reduce) { .eagle-avatar[data-moving='true'] img { animation: none; } }
 
 /* Follow-camera eagle: rear feathers in straight flight, side profile only while banking into a turn. */
-.eagle-avatar { bottom: -1px; width: 170px; height: 170px; perspective: 720px; }
+.eagle-avatar { bottom: -32px; width: 170px; height: 170px; perspective: 720px; }
 .eagle-avatar .eagle-rear, .eagle-avatar .eagle-side { display: block; }
 .eagle-avatar .eagle-side { display: none; }
 .eagle-avatar[data-turn='left'] .eagle-rear, .eagle-avatar[data-turn='right'] .eagle-rear { display: none; }
@@ -1179,13 +1179,14 @@ body { font-family: "Fira Sans", Inter, "PingFang SC", "Microsoft YaHei", ui-san
 .eagle-avatar[data-turn='left'] { --eagle-bank: -14deg; --eagle-yaw: -24deg; }
 .eagle-avatar[data-turn='right'] { --eagle-bank: 14deg; --eagle-yaw: 24deg; }
 .eagle-avatar { transform: translateX(-50%) scale(1.5) rotateY(var(--eagle-yaw, 0deg)) rotateZ(var(--eagle-bank, 0deg)); }
-@media (max-width: 700px) { .eagle-avatar { bottom: -1px; width: 132px; height: 132px; transform: translateX(-50%) scale(1.5) rotateY(var(--eagle-yaw, 0deg)) rotateZ(var(--eagle-bank, 0deg)); } }
+@media (max-width: 700px) { .eagle-avatar { bottom: -22px; width: 132px; height: 132px; transform: translateX(-50%) scale(1.5) rotateY(var(--eagle-yaw, 0deg)) rotateZ(var(--eagle-bank, 0deg)); } }
 
 /* Circular translucent controls: QWER / ASDF arranged like a compact flight keypad. */
-.virtual-keyboard { padding: 8px 10px; border: 1px solid rgba(255, 255, 255, .24); border-radius: 28px; background: rgba(8, 24, 45, .28); box-shadow: inset 0 1px rgba(255, 255, 255, .16), 0 8px 22px rgba(0, 0, 0, .16); backdrop-filter: blur(8px); }
-.virtual-key { width: 38px; min-width: 38px; height: 38px; padding: 0; border-radius: 50%; }
-.key-row-wide .virtual-key { width: 100%; height: 32px; min-height: 32px; border-radius: 18px; }
-@media (max-width: 700px) { .virtual-key { width: 34px; min-width: 34px; height: 34px; } }
+.virtual-keyboard { display: grid; align-content: center; gap: 5px; width: 164px; height: 164px; padding: 20px 14px; border: 1px solid rgba(255, 255, 255, .3); border-radius: 50%; background: radial-gradient(circle at 35% 25%, rgba(255, 255, 255, .2), rgba(8, 24, 45, .48) 68%); box-shadow: inset 0 1px rgba(255, 255, 255, .2), 0 10px 26px rgba(0, 0, 0, .22); backdrop-filter: blur(10px); box-sizing: border-box; }
+.key-row { gap: 4px; }
+.virtual-key { width: 30px; min-width: 30px; height: 30px; padding: 0; border-radius: 50%; }
+.key-row-wide .virtual-key { width: 122px; height: 28px; min-height: 28px; margin: 0 auto; border-radius: 15px; }
+@media (max-width: 700px) { .virtual-keyboard { width: 148px; height: 148px; padding: 18px 10px; } .virtual-key { width: 28px; min-width: 28px; height: 28px; } .key-row-wide .virtual-key { width: 116px; } }
 
 /* Detail view contrast: the scene stays dark, while its surrounding metadata remains readable. */
 .model-detail { border-color: #c7d7e6 !important; background: #ffffff !important; color: #12345b !important; }
