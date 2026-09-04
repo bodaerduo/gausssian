@@ -1,5 +1,5 @@
 services:
-  backend:
+  app:
     environment:
       ABOT_RECON_ENABLED: "true"
       ABOT_RECON_URL: http://abot-worker:8091

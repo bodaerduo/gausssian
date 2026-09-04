@@ -75,8 +75,8 @@ export ABOT_BASE_IMAGE='gaussian:deps'
 
 ```bash
 ABOT_RECON_CUDA_IMAGE=gaussian:deps \
-docker compose -p gaussian \
-  -f docker/compose.yml \
+docker compose -p gussian \
+  -f docker/compose-gussian.yml \
   -f docker/compose-abot.yml \
   up -d --build
 ```
@@ -93,7 +93,7 @@ docker network ls | grep gaussian || true
 如果主 Compose 尚未创建 `gaussian-data`，可以先启动标准服务：
 
 ```bash
-docker compose -p gaussian -f docker/compose.yml up -d
+docker compose -p gussian -f docker/compose-gussian.yml up -d
 ```
 
 ## 4. 创建临时安装容器

@@ -3,9 +3,9 @@ set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="${APP_DIR:-$(cd -- "$SCRIPT_DIR/.." && pwd)}"
-COMPOSE_PROJECT="${COMPOSE_PROJECT:-gaussian-ready}"
-COMPOSE_FILE="${COMPOSE_FILE:-docker/compose-ready.yml}"
-PUBLIC_URL="${PUBLIC_URL:-http://127.0.0.1:8080/}"
+COMPOSE_PROJECT="${COMPOSE_PROJECT:-gussian}"
+COMPOSE_FILE="${COMPOSE_FILE:-docker/compose-gussian.yml}"
+PUBLIC_URL="${PUBLIC_URL:-https://127.0.0.1:8080/}"
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org}"
 HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS:-180}"
 HEALTH_INTERVAL_SECONDS="${HEALTH_INTERVAL_SECONDS:-3}"
@@ -55,7 +55,7 @@ while (( elapsed < HEALTH_TIMEOUT_SECONDS )); do
     if [[ "$running" != "true" ]]; then
       status="stopped"
     elif [[ "$health" == "healthy" ]]; then
-      if curl -fsS --max-time 5 "$PUBLIC_URL" >/dev/null 2>&1; then
+      if curl -kfsS --max-time 5 "$PUBLIC_URL" >/dev/null 2>&1; then
         printf '\n'
         docker compose -p "$COMPOSE_PROJECT" -f "$COMPOSE_FILE" ps
         log "服务已就绪：容器健康，网页=$PUBLIC_URL"

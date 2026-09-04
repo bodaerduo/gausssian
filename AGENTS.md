@@ -51,7 +51,7 @@ APP_DIR="$PWD" ./scripts/setup-supersplat-ubuntu.sh
 如果宿主机 APT 依赖异常，优先使用 Docker GPU 部署：
 
 ```bash
-docker compose -p gaussian -f docker/compose.yml up -d --build
+docker compose -p gussian -f docker/compose-gussian.yml up -d --build
 ```
 
 容器方案说明见 `docs/container-deployment.md`。

@@ -49,7 +49,7 @@ sudo systemctl restart gaussian-web
 
 ```bash
 SUPER_SPLAT_REF=<commit-or-tag> \
-docker compose -p gaussian -f docker/compose.yml up -d --build
+docker compose -p gussian -f docker/compose-gussian.yml up -d --build
 ```
 
 容器 Dockerfile 会在构建阶段准备 SuperSplat 和 SplatTransform；这与宿主机模块脚本互相独立。

@@ -42,7 +42,7 @@ docker run --rm --gpus all \
 ```bash
 chmod +x scripts/setup-self-signed-https.sh
 TLS_IP=192.168.2.11 ./scripts/setup-self-signed-https.sh
-docker compose -p gaussian -f docker/compose.yml up -d --build
+docker compose -p gussian -f docker/compose-gussian.yml up -d --build
 ```
 
 首次构建会拉取 `devel` 镜像、编译 COLMAP、编译 Brush、构建前端，预计 30–90 分钟；后续只启动已有镜像通常为数秒到数分钟。
@@ -64,10 +64,10 @@ https://192.168.2.11:8080/
 API 健康检查：
 
 ```bash
-docker compose -p gaussian -f docker/compose.yml exec -T backend \
+docker compose -p gussian -f docker/compose-gussian.yml exec -T app \
   curl -f http://127.0.0.1:4178/health
-docker compose -p gaussian -f docker/compose.yml ps
-docker compose -p gaussian -f docker/compose.yml logs -f backend
+docker compose -p gussian -f docker/compose-gussian.yml ps
+docker compose -p gussian -f docker/compose-gussian.yml logs -f app
 ```
 
 ## 参数
@@ -95,7 +95,7 @@ ABot-Recon 不安装进现有 `backend` 镜像。使用额外的 Compose 覆盖�
 如果服务器已经有 CUDA 12.4 devel 基础镜像，需要先手动补齐依赖并验收，可参考[手动安装 ABot-Recon Worker](./manual-abot-recon-container-build.md)。
 
 ```bash
-docker compose -p gaussian -f docker/compose.yml -f docker/compose-abot.yml up -d --build
+docker compose -p gussian -f docker/compose-gussian.yml -f docker/compose-abot.yml up -d --build
 ```
 
 该覆盖文件只新增 `abot-worker`，并给主 API 注入 `ABOT_RECON_URL=http://abot-worker:8091`；现有 Brush/COLMAP 容器仍使用原来的 CUDA 12.4 镜像和生产命令。两个容器共享 `gaussian-data`，因此 Worker 可以读取主 API 保存的视频，并把 `preview/*.ply` 写回同一个任务目录，但 Python、PyTorch 和 CUDA 用户态库完全隔离。
@@ -105,8 +105,8 @@ docker compose -p gaussian -f docker/compose.yml -f docker/compose-abot.yml up -
 ### POC 验收
 
 ```bash
-docker compose -p gaussian -f docker/compose.yml -f docker/compose-abot.yml ps
-docker compose -p gaussian -f docker/compose.yml -f docker/compose-abot.yml logs -f abot-worker
+docker compose -p gussian -f docker/compose-gussian.yml -f docker/compose-abot.yml ps
+docker compose -p gussian -f docker/compose-gussian.yml -f docker/compose-abot.yml logs -f abot-worker
 curl -f http://127.0.0.1:${ABOT_RECON_PORT:-8091}/health
 ```
 

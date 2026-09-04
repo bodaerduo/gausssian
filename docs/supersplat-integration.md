@@ -25,7 +25,7 @@ SPLAT_TRANSFORM_VERSION=3.3.3 \
 
 ```bash
 SUPER_SPLAT_REF=<commit-or-tag> \
-docker compose -p gaussian -f docker/compose.yml up -d --build
+docker compose -p gussian -f docker/compose-gussian.yml up -d --build
 ```
 
 镜像构建阶段会单独构建 SuperSplat，并将 `dist` 复制到前端静态目录；运行阶段安装 SplatTransform CLI。容器启动后编辑器地址为 `/editor`，模型详情页的“SuperSplat 编辑”按钮会带上当前 PLY URL。

@@ -34,7 +34,7 @@ APP_DIR="$PWD" ./scripts/setup-supersplat-ubuntu.sh
 ```bash
 chmod +x scripts/setup-self-signed-https.sh
 TLS_IP=192.168.2.11 ./scripts/setup-self-signed-https.sh
-docker compose -p gaussian -f docker/compose.yml up -d --build
+docker compose -p gussian -f docker/compose-gussian.yml up -d --build
 ```
 
 详细说明：
@@ -46,12 +46,12 @@ docker compose -p gaussian -f docker/compose.yml up -d --build
 - [`docs/abot-streaming-scan-plan.md`](./docs/abot-streaming-scan-plan.md)
 - [`docs/manual-abot-recon-container-build.md`](./docs/manual-abot-recon-container-build.md)：基于现有 CUDA 12.4 devel 镜像手动安装 ABot-Recon Worker 依赖。
 
-如需让局域网浏览器通过 HTTPS 使用 SuperSplat WebGPU 编辑器，可执行 `TLS_IP=192.168.2.11 ./scripts/setup-self-signed-https.sh`，再启动 `docker/compose.yml`；具体步骤见 [`docs/container-deployment.md`](./docs/container-deployment.md)。
+如需让局域网浏览器通过 HTTPS 使用 SuperSplat WebGPU 编辑器，可执行 `TLS_IP=192.168.2.11 ./scripts/setup-self-signed-https.sh`，再启动 `docker/compose-gussian.yml`；具体步骤见 [`docs/container-deployment.md`](./docs/container-deployment.md)。
 
 当前服务器已有 CUDA 12.4.1 runtime 镜像时，容器部署入口为：
 
 ```bash
-docker compose -p gaussian -f docker/compose.yml up -d --build
+docker compose -p gussian -f docker/compose-gussian.yml up -d --build
 ```
 
-如果需要在容器内反复安装依赖、重试构建并封装成长期镜像，使用 [`docs/manual-container-build.md`](./docs/manual-container-build.md)；成功后通过 `docker/compose-ready.yml` 直接启动，不会重新构建。
+如果需要在容器内反复安装依赖、重试构建并封装成长期镜像，使用 [`docs/manual-container-build.md`](./docs/manual-container-build.md)；成功后通过 `docker/compose-gussian.yml` 直接启动，不会重新构建。

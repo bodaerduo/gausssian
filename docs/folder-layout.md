@@ -23,8 +23,7 @@ gaussian/
 │   └── setup-supersplat-ubuntu.sh
 ├── docker/                # 单镜像 GPU 容器定义
 │   ├── backend.Dockerfile
-│   ├── compose.yml
-│   ├── compose-ready.yml
+│   ├── compose-gussian.yml
 │   ├── check-environment.sh
 │   ├── prepare-manual.sh
 │   └── start.sh

@@ -62,34 +62,36 @@ docker image inspect gaussian:deps --format '{{.Id}}'
 
 ## 4. Compose 一键启动
 
-`compose-ready.yml` 不包含 `build:`，只启动已经封装好的依赖镜像，并将当前项目代码挂载到容器：
+`compose-gussian.yml` 不包含 `build:`，只启动已经封装好的依赖镜像，并将当前项目代码挂载到容器：
 
 ```bash
-docker compose -p gaussian-ready -f docker/compose-ready.yml up -d
+chmod +x scripts/setup-self-signed-https.sh
+TLS_IP=192.168.2.11 ./scripts/setup-self-signed-https.sh
+docker compose -p gussian -f docker/compose-gussian.yml up -d
 ```
 
 检查服务：
 
 ```bash
-docker compose -p gaussian-ready -f docker/compose-ready.yml ps
-docker compose -p gaussian-ready -f docker/compose-ready.yml logs -f app
-docker compose -p gaussian-ready -f docker/compose-ready.yml exec -T app \
+docker compose -p gussian -f docker/compose-gussian.yml ps
+docker compose -p gussian -f docker/compose-gussian.yml logs -f app
+docker compose -p gussian -f docker/compose-gussian.yml exec -T app \
   curl -f http://127.0.0.1:4178/health
 ```
 
-访问：`http://服务器地址:8080/`。
+访问：`https://192.168.2.11:8080/`（首次访问接受自签名证书警告）。
 
 项目目录以读写方式挂载到容器 `/workspace/gaussian`，FastAPI 和前端都直接使用该目录中的代码；前端 `node_modules`、`.next` 等构建产物保留在该目录的忽略路径。模型数据写入宿主机项目下的 `runtime/data`，容器删除后数据仍保留。以后启动只需执行：
 
 ```bash
-docker compose -p gaussian-ready -f docker/compose-ready.yml start
+docker compose -p gussian -f docker/compose-gussian.yml start
 ```
 
 发布新代码后不需要重新封装依赖镜像。更新宿主机项目并重建容器即可；启动脚本会根据 `package-lock.json` 和前端源码哈希自动判断是否需要执行 `npm ci`/`npm run build`：
 
 ```bash
 git pull --ff-only origin main
-docker compose -p gaussian-ready -f docker/compose-ready.yml up -d --force-recreate
+docker compose -p gussian -f docker/compose-gussian.yml up -d --force-recreate
 ```
 
 不要执行 `docker compose ... build`、`docker builder prune` 或 `docker system prune`。
