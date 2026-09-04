@@ -632,6 +632,14 @@ h2 { color: #eaf1fc; font-size: 13px; }
 .task-meta b { color: #b6c5d8; font-weight: 650; }
 .task-meta .outline-button { margin-left: auto; padding: 7px 9px; font-size: 9px; }
 
+/* The history view owns the available height; cards scroll without showing a scrollbar. */
+.task-list-view { min-height: 0; flex: 1 1 auto; grid-template-rows: auto minmax(0, 1fr); }
+.task-panel { min-height: 0; display: flex; flex-direction: column; }
+.task-panel .task-list { min-height: 0; flex: 1 1 auto; overflow-y: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.task-panel .task-list::-webkit-scrollbar { width: 0; height: 0; display: none; }
+.job-state.paused { color: #a66b11; border-color: rgba(239, 163, 76, .45); background: #fff8e9; }
+.job-state.cancelled { color: #718097; border-color: rgba(113, 128, 151, .35); background: #f0f3f7; }
+
 /* Task cards: prioritize readable results over engine internals. */
 .task-card { border-color: #d7e4f2; border-radius: 14px; background: linear-gradient(135deg, #ffffff 0%, #f5f9fd 100%); box-shadow: 0 10px 24px rgba(28, 67, 105, .08); }
 .task-card-head strong { color: #173457; font-size: 15px; font-weight: 750; letter-spacing: -.01em; }
@@ -1156,6 +1164,9 @@ body { font-family: "Fira Sans", Inter, "PingFang SC", "Microsoft YaHei", ui-san
 .roam-hud h2, .control-cluster strong { color: #12345b !important; }
 .roam-hud p, .control-cluster small, .control-cluster span, .roam-loadout > div > span, .roam-loadout > span, .roam-loadout > small { color: #7088a1 !important; }
 .roam-close { border-color: #8db7d6 !important; color: #1769aa !important; background: #ffffff !important; }
+.job-state.paused { color: #9a650d !important; border-color: #e4c27d !important; background: #fff8e8 !important; }
+.job-state.cancelled { color: #58718c !important; border-color: #b7c9dc !important; background: #f2f6fa !important; }
+.task-meta .outline-button { margin-left: 0; }
 .roam-close:hover { border-color: #1769aa !important; color: #0d4f86 !important; }
 .roam-loadout { width: 225px !important; }
 .roam-object-badge { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid #c7d7e6; border-radius: 8px; color: #284d72; background: #ffffff; font-size: 10px; }

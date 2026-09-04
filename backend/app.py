@@ -18,7 +18,7 @@ import urllib.request
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Any, AsyncIterator
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -34,7 +34,7 @@ QUALITY = {
 }
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".webm", ".m4v"}
-TERMINAL_STATUSES = {"completed", "failed"}
+TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
 
 
 def env_int(name: str, default: int) -> int:
@@ -99,6 +99,14 @@ STATE_LOCK = threading.RLock()
 LOG_LOCK = threading.RLock()
 JOB_LOCKS: dict[str, threading.RLock] = {}
 EXECUTOR = ThreadPoolExecutor(max_workers=MAX_WORKERS, thread_name_prefix="gaussian-worker")
+JOB_FUTURES: dict[str, Future[Any]] = {}
+JOB_CANCEL_EVENTS: dict[str, threading.Event] = {}
+JOB_PAUSE_EVENTS: dict[str, threading.Event] = {}
+JOB_PROCESSES: dict[str, subprocess.Popen[str]] = {}
+
+
+class JobCancelled(Exception):
+    """Raised inside a worker after a user requests task cancellation."""
 
 
 def now() -> str:
@@ -151,6 +159,42 @@ def write_state(job_id: str, state: dict[str, Any]) -> None:
     temporary.replace(path)
 
 
+def job_cancel_requested(job_id: str) -> bool:
+    event = JOB_CANCEL_EVENTS.get(job_id)
+    return event is not None and event.is_set()
+
+
+def wait_for_job_control(job_id: str) -> None:
+    if job_cancel_requested(job_id):
+        raise JobCancelled()
+    pause = JOB_PAUSE_EVENTS.get(job_id)
+    while pause is not None and pause.is_set():
+        if job_cancel_requested(job_id):
+            raise JobCancelled()
+        time.sleep(0.2)
+
+
+def signal_job_process(job_id: str, signum: int) -> None:
+    process = JOB_PROCESSES.get(job_id)
+    if process is None or process.poll() is not None:
+        return
+    try:
+        if os.name == "nt":
+            if signum == signal.SIGTERM:
+                process.terminate()
+        else:
+            os.killpg(process.pid, signum)
+    except (OSError, ProcessLookupError):
+        pass
+
+
+def cleanup_job_runtime(job_id: str) -> None:
+    JOB_FUTURES.pop(job_id, None)
+    JOB_CANCEL_EVENTS.pop(job_id, None)
+    JOB_PAUSE_EVENTS.pop(job_id, None)
+    JOB_PROCESSES.pop(job_id, None)
+
+
 def emit(job_id: str, *, event_type: str = "progress", phase: str, progress: int, message: str, **extra: Any) -> None:
     lock = JOB_LOCKS[job_id]
     with lock:
@@ -169,6 +213,8 @@ def emit(job_id: str, *, event_type: str = "progress", phase: str, progress: int
             status = "completed"
         elif event_type == "failed":
             status = "failed"
+        elif event_type == "cancelled":
+            status = "cancelled"
         elif status == "queued":
             status = "processing"
         state.update({"status": status, "phase": phase, "progress": progress, "message": message, "phase_started_at": phase_started_at, "stage_durations": stage_durations, **extra})
@@ -213,6 +259,7 @@ def run_command(
     timeout: int = 0,
     error_output: tuple[str, ...] = (),
 ) -> None:
+    wait_for_job_control(job_id)
     command_line = shlex.join(command)
     append_log(job_id, f"\n$ {command_line}\n")
     try:
@@ -230,21 +277,30 @@ def run_command(
     except FileNotFoundError as exc:
         raise RuntimeError(f"找不到可执行文件：{command[0]}") from exc
 
-    deadline = time.monotonic() + timeout if timeout else None
-    assert process.stdout is not None
-    for line in process.stdout:
-        append_log(job_id, line)
-        if any(marker.lower() in line.lower() for marker in error_output):
-            append_log(job_id, f"ERROR: GPU 加速异常或发生 CPU 回退：{line.strip()}\n")
-        if deadline and time.monotonic() > deadline:
-            os.killpg(process.pid, signal.SIGTERM)
-            raise RuntimeError(f"命令超时：{command[0]}")
-    return_code = process.wait()
-    if return_code != 0:
-        raise RuntimeError(
-            f"命令失败（退出码 {return_code}）：{command[0]}，详见任务 worker.log 或 "
-            "GAUSSIAN_DATA_ROOT/logs/YYYY-MM-DD.log"
-        )
+    JOB_PROCESSES[job_id] = process
+
+    try:
+        deadline = time.monotonic() + timeout if timeout else None
+        assert process.stdout is not None
+        for line in process.stdout:
+            append_log(job_id, line)
+            if any(marker.lower() in line.lower() for marker in error_output):
+                append_log(job_id, f"ERROR: GPU 加速异常或发生 CPU 回退：{line.strip()}\n")
+            if job_cancel_requested(job_id):
+                signal_job_process(job_id, signal.SIGTERM)
+            if deadline and time.monotonic() > deadline:
+                signal_job_process(job_id, signal.SIGTERM)
+                raise RuntimeError(f"命令超时：{command[0]}")
+        return_code = process.wait()
+        if job_cancel_requested(job_id):
+            raise JobCancelled()
+        if return_code != 0:
+            raise RuntimeError(
+                f"命令失败（退出码 {return_code}）：{command[0]}，详见任务 worker.log 或 "
+                "GAUSSIAN_DATA_ROOT/logs/YYYY-MM-DD.log"
+            )
+    finally:
+        JOB_PROCESSES.pop(job_id, None)
 
 
 def safe_filename(filename: str | None, fallback: str) -> str:
@@ -559,6 +615,7 @@ def run_remote_addon_pipeline(job_id: str, source_kind: str, source_path: Path, 
         raise RuntimeError(f"{route_name} Worker 未返回任务 ID")
     event_index = 0
     while True:
+        wait_for_job_control(job_id)
         status = json_http(f"{service_url}/v1/jobs/{worker_job_id}")
         events = status.get("events", [])
         for event in events[event_index:]:
@@ -590,9 +647,20 @@ def worker_entry(job_id: str, source_kind: str, source_path: Path, quality_name:
             run_pipeline(job_id, source_kind, source_path, quality_name)
         else:
             run_addon_pipeline(job_id, source_kind, source_path, quality_name, route)
+    except JobCancelled:
+        state = read_state(job_id) or {}
+        emit(
+            job_id,
+            event_type="cancelled",
+            phase=state.get("phase", "已取消"),
+            progress=int(state.get("progress", 0)),
+            message="任务已取消",
+        )
     except Exception as exc:  # noqa: BLE001 - boundary for background jobs
         append_log(job_id, f"\nERROR: {exc}\n")
         emit(job_id, event_type="failed", phase="失败", progress=0, message=str(exc))
+    finally:
+        cleanup_job_runtime(job_id)
 
 
 @asynccontextmanager
@@ -667,6 +735,8 @@ async def create_reconstruction(
     root = job_dir(job_id)
     root.mkdir(parents=True, exist_ok=False)
     JOB_LOCKS[job_id] = threading.RLock()
+    JOB_CANCEL_EVENTS[job_id] = threading.Event()
+    JOB_PAUSE_EVENTS[job_id] = threading.Event()
     created_at = now()
     state = {"id": job_id, "status": "queued", "progress": 0, "phase": "素材检查", "message": "任务已排队", "quality": quality, "route": selected_route["id"], "asset_type": selected_route["asset_type"], "created_at": created_at, "updated_at": created_at, "phase_started_at": created_at, "stage_durations": {}}
     state_path(job_id).write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -693,9 +763,10 @@ async def create_reconstruction(
     except Exception:
         shutil.rmtree(root, ignore_errors=True)
         JOB_LOCKS.pop(job_id, None)
+        cleanup_job_runtime(job_id)
         raise
 
-    EXECUTOR.submit(worker_entry, job_id, source_kind, source_path, quality, selected_route["id"])
+    JOB_FUTURES[job_id] = EXECUTOR.submit(worker_entry, job_id, source_kind, source_path, quality, selected_route["id"])
     return {"id": job_id, "status": "queued", "route": selected_route["id"], "asset_type": selected_route["asset_type"], "events_url": f"/api/v1/reconstructions/{job_id}/events", "download_url": f"/api/v1/reconstructions/{job_id}/download/{job_id}.ply"}
 
 
@@ -791,10 +862,24 @@ def delete_reconstruction(job_id: str) -> None:
     state = read_state(job_id)
     if state is None:
         raise HTTPException(status_code=404, detail="任务不存在")
-    if state.get("status") in {"queued", "processing"}:
-        raise HTTPException(status_code=409, detail="任务正在运行，暂不能删除")
+    if state.get("status") in {"queued", "processing", "paused"}:
+        cancel_event = JOB_CANCEL_EVENTS.setdefault(job_id, threading.Event())
+        cancel_event.set()
+        JOB_PAUSE_EVENTS.setdefault(job_id, threading.Event()).clear()
+        if os.name != "nt":
+            signal_job_process(job_id, signal.SIGCONT)
+        signal_job_process(job_id, signal.SIGTERM)
+        future = JOB_FUTURES.get(job_id)
+        if future is not None and not future.done() and not future.cancel():
+            try:
+                future.result(timeout=10)
+            except TimeoutError as exc:
+                raise HTTPException(status_code=409, detail="任务正在停止，请稍后重试删除") from exc
+            except Exception:
+                pass
     shutil.rmtree(job_dir(job_id), ignore_errors=False)
     JOB_LOCKS.pop(job_id, None)
+    cleanup_job_runtime(job_id)
 
 
 @app.post("/api/v1/reconstructions/{job_id}/variants", status_code=201)
@@ -926,6 +1011,60 @@ def reconstruction_status(job_id: str) -> dict[str, Any]:
     return state
 
 
+def write_control_event(job_id: str, event_type: str, status: str, message: str) -> dict[str, Any]:
+    lock = JOB_LOCKS.setdefault(job_id, threading.RLock())
+    with lock:
+        state = read_state(job_id)
+        if state is None:
+            raise HTTPException(status_code=404, detail="任务不存在")
+        state["status"] = status
+        state["message"] = message
+        event = {
+            "type": event_type,
+            "id": job_id,
+            "phase": state.get("phase", "素材检查"),
+            "progress": int(state.get("progress", 0)),
+            "message": message,
+        }
+        with events_path(job_id).open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(event, ensure_ascii=False) + "\n")
+        write_state(job_id, state)
+        return state
+
+
+@app.post("/api/v1/reconstructions/{job_id}/pause")
+def pause_reconstruction(job_id: str) -> dict[str, Any]:
+    if not valid_job_id(job_id):
+        raise HTTPException(status_code=404, detail="任务不存在")
+    state = read_state(job_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if state.get("status") == "paused":
+        return state
+    if state.get("status") not in {"queued", "processing"}:
+        raise HTTPException(status_code=409, detail="只有排队中或建模中的任务可以暂停")
+    JOB_PAUSE_EVENTS.setdefault(job_id, threading.Event()).set()
+    write_control_event(job_id, "paused", "paused", "任务已暂停，等待恢复")
+    if os.name != "nt":
+        signal_job_process(job_id, signal.SIGSTOP)
+    return read_state(job_id) or state
+
+
+@app.post("/api/v1/reconstructions/{job_id}/resume")
+def resume_reconstruction(job_id: str) -> dict[str, Any]:
+    if not valid_job_id(job_id):
+        raise HTTPException(status_code=404, detail="任务不存在")
+    state = read_state(job_id)
+    if state is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    if state.get("status") != "paused":
+        raise HTTPException(status_code=409, detail="任务当前不是暂停状态")
+    JOB_PAUSE_EVENTS.setdefault(job_id, threading.Event()).clear()
+    if os.name != "nt":
+        signal_job_process(job_id, signal.SIGCONT)
+    return write_control_event(job_id, "resumed", "processing", "任务已恢复，继续建模")
+
+
 @app.patch("/api/v1/reconstructions/{job_id}")
 def update_reconstruction(job_id: str, payload: ReconstructionUpdate) -> dict[str, Any]:
     """Persist user-facing scene metadata alongside the generated model."""
@@ -997,6 +1136,8 @@ async def reconstruction_events(job_id: str) -> StreamingResponse:
                     yield f"data: {line}\n\n"
                 line_number = len(lines)
             state = read_state(job_id)
+            if state is None and not path.exists():
+                break
             if state and state.get("status") in TERMINAL_STATUSES and line_number >= len(path.read_text(encoding="utf-8").splitlines()):
                 break
             yield ": heartbeat\n\n"
