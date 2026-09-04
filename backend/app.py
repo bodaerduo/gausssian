@@ -469,7 +469,7 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
         phase="PLY 质量校验",
         progress=100,
         message="建模完成，模型可以下载",
-        download_url=f"/api/v1/reconstructions/{job_id}/download",
+        download_url=f"/api/v1/reconstructions/{job_id}/download/{job_id}.ply",
         ply_bytes=ply.stat().st_size,
         image_count=count,
         splat_count=splat_count,
@@ -686,7 +686,7 @@ async def create_reconstruction(
         raise
 
     EXECUTOR.submit(worker_entry, job_id, source_kind, source_path, quality, selected_route["id"])
-    return {"id": job_id, "status": "queued", "route": selected_route["id"], "asset_type": selected_route["asset_type"], "events_url": f"/api/v1/reconstructions/{job_id}/events", "download_url": f"/api/v1/reconstructions/{job_id}/download"}
+    return {"id": job_id, "status": "queued", "route": selected_route["id"], "asset_type": selected_route["asset_type"], "events_url": f"/api/v1/reconstructions/{job_id}/events", "download_url": f"/api/v1/reconstructions/{job_id}/download/{job_id}.ply"}
 
 
 @app.get("/api/v1/reconstructions")
@@ -699,7 +699,7 @@ def list_reconstructions() -> dict[str, list[dict[str, Any]]]:
                 continue
             state = read_state(path.name)
             if state:
-                state["modelUrl"] = f"/api/v1/reconstructions/{path.name}/download"
+                state["modelUrl"] = f"/api/v1/reconstructions/{path.name}/download/{path.name}.ply"
                 jobs.append(state)
     jobs.sort(key=lambda item: item.get("created_at", ""), reverse=True)
     return {"jobs": jobs}
@@ -771,7 +771,7 @@ async def import_ply(file: UploadFile = File(...)) -> dict[str, Any]:
         "image_count": 0,
     }
     state_path(job_id).write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
-    return {"id": job_id, "status": "completed", "modelUrl": f"/api/v1/reconstructions/{job_id}/download", "splat_count": splat_count, "ply_bytes": target.stat().st_size}
+    return {"id": job_id, "status": "completed", "modelUrl": f"/api/v1/reconstructions/{job_id}/download/{job_id}.ply", "splat_count": splat_count, "ply_bytes": target.stat().st_size}
 
 
 @app.delete("/api/v1/reconstructions/{job_id}", status_code=204)
@@ -951,6 +951,13 @@ def download_reconstruction(job_id: str) -> FileResponse:
     if not output.exists():
         raise HTTPException(status_code=409, detail="模型尚未生成")
     return FileResponse(output, media_type="application/octet-stream", filename=f"{job_id}.ply")
+
+
+@app.get("/api/v1/reconstructions/{job_id}/download/{filename}")
+def download_reconstruction_named(job_id: str, filename: str) -> FileResponse:
+    if filename != f"{job_id}.ply":
+        raise HTTPException(status_code=404, detail="模型文件不存在")
+    return download_reconstruction(job_id)
 
 
 @app.get("/api/v1/reconstructions/{job_id}/model")
