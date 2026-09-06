@@ -188,6 +188,19 @@ def pseudo_rgb_colors(points: np.ndarray) -> np.ndarray:
     return np.clip((points / np.maximum(span, 1e-6) + 1) * 127.5, 0, 255).astype(np.uint8)
 
 
+def trim_spatial_outliers(points: np.ndarray, colors: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Drop a tiny number of far-away points that would collapse the viewer framing."""
+    if len(points) < 200:
+        return points, colors
+    center = np.median(points, axis=0)
+    distances = np.linalg.norm(points - center, axis=1)
+    limit = float(np.percentile(distances, 99.5))
+    if not np.isfinite(limit) or limit <= 0:
+        return points, colors
+    keep = distances <= limit
+    return points[keep], colors[keep]
+
+
 def publish_preview_batch(job_id: str, result: Any, frames: list[Path], preview_dir: Path, preview_index: int, frame_offset: int, total_frames: int, accumulated: list[np.ndarray], accumulated_colors: list[np.ndarray], trajectory: list[list[float]], global_anchor: np.ndarray | None) -> tuple[int, np.ndarray | None]:
     points_value = result.world_points if result.world_points is not None else result.local_points
     if points_value is None:
@@ -205,6 +218,7 @@ def publish_preview_batch(job_id: str, result: Any, frames: list[Path], preview_
     accumulated_colors.append(colors if colors is not None else pseudo_rgb_colors(transformed))
     merged = np.concatenate(accumulated, axis=0)
     merged_colors = np.concatenate(accumulated_colors, axis=0)
+    merged, merged_colors = trim_spatial_outliers(merged, merged_colors)
     preview_name = f"points-{preview_index + 1:04d}.ply"
     count = write_ply(preview_dir / preview_name, merged, merged_colors)
     confidence = None

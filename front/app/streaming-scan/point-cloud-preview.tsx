@@ -52,10 +52,11 @@ export function PointCloudPreview({ modelUrl, range }: { modelUrl: string; range
       geometry.setDrawRange(0, Math.max(1, Math.floor(total * rangeRef.current / 100)));
       geometryRef.current = geometry;
       countRef.current = total;
-      const material = new THREE.PointsMaterial({ size: .018, sizeAttenuation: true, vertexColors: Boolean(geometry.getAttribute('color')), color: '#109f9b', transparent: true, opacity: .92 });
+      const material = new THREE.PointsMaterial({ size: .024, sizeAttenuation: true, vertexColors: Boolean(geometry.getAttribute('color')), color: '#ffffff', transparent: true, opacity: .94 });
       const points = new THREE.Points(geometry, material);
       scene.add(points);
       const radius = geometry.boundingSphere?.radius || 1;
+      material.size = Math.max(.012, Math.min(.09, radius * .003));
       camera.position.set(radius * .7, radius * .45, radius * 2.3);
       camera.near = Math.max(.001, radius / 1000);
       camera.far = Math.max(100, radius * 20);
@@ -88,14 +89,15 @@ export function PointCloudAssetPreview({ previewUrl, range }: { previewUrl: stri
 
   useEffect(() => {
     let cancelled = false;
-    void fetch(previewUrl, { cache: 'no-store' })
+    const manifestUrl = new URL(previewUrl, window.location.href).toString();
+    void fetch(manifestUrl, { cache: 'no-store' })
       .then(async (response) => {
         if (!response.ok) throw new Error('预览资产清单不可用');
         const manifest = await response.json() as PreviewManifest;
         const assets = (manifest.assets ?? []).filter((asset) => asset.url && asset.name?.toLowerCase().endsWith('.ply'));
         const latest = assets.at(-1);
         if (!latest?.url) throw new Error('尚未生成点云预览');
-        if (!cancelled) setAsset({ url: new URL(latest.url, previewUrl).toString() });
+        if (!cancelled) setAsset({ url: new URL(latest.url, manifestUrl).toString() });
       })
       .catch((cause: unknown) => { if (!cancelled) setAsset({ error: cause instanceof Error ? cause.message : '预览资产加载失败' }); });
     return () => { cancelled = true; };

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { ChangeEvent, type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { PointCloudPreview } from './point-cloud-preview';
 
@@ -110,7 +109,7 @@ export default function StreamingScanPage() {
     <main className="streaming-scan-page">
       <header className="streaming-scan-header">
         <div className="streaming-brand"><span className="streaming-pulse" /><div><span className="streaming-kicker">ABOT-RECON / STREAMING SCAN</span><h1>流式扫描</h1></div></div>
-        <div className="streaming-header-actions"><span className="streaming-worker-status"><i className={submitting ? 'online' : ''} /> {workerMessage}</span><Link className="streaming-back" href="/" prefetch={false}>返回工作台</Link></div>
+        <div className="streaming-header-actions"><span className="streaming-worker-status"><i className={submitting ? 'online' : ''} /> {workerMessage}</span><button className="streaming-back" type="button" onClick={() => { window.location.href = '/'; }}>返回工作台</button></div>
       </header>
 
       <section className="streaming-stage" aria-label="视频与扫描预览">

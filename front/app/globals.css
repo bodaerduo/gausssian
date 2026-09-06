@@ -292,7 +292,7 @@ h2 { margin: 0; color: var(--ink); font-size: 13px; font-weight: 760; letter-spa
 .streaming-header-actions { display: flex; align-items: center; gap: 14px; }
 .streaming-worker-status { color: var(--stream-muted); font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; }
 .streaming-worker-status i { display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; background: #f3ba69; }
-.streaming-back { padding: 8px 12px; border: 1px solid rgba(161, 185, 211, .25); border-radius: 7px; color: var(--stream-ink); font-size: 11px; text-decoration: none; }
+.streaming-back { padding: 8px 12px; border: 1px solid rgba(161, 185, 211, .25); border-radius: 7px; color: var(--stream-ink); font: inherit; font-size: 11px; text-decoration: none; cursor: pointer; }
 .streaming-stage { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .stream-pane { min-width: 0; padding: 12px; border: 1px solid rgba(161, 185, 211, .16); border-radius: 14px; background: rgba(15, 30, 46, .78); box-shadow: 0 22px 60px rgba(0, 0, 0, .2); }
 .stream-pane-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 2px 10px; color: var(--stream-muted); font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; }
