@@ -95,7 +95,7 @@ ABot-Recon 不安装进现有 `backend` 镜像。使用额外的 Compose 覆盖�
 如果服务器已经有 CUDA 12.4 devel 基础镜像，需要先手动补齐依赖并验收，可参考[手动安装 ABot-Recon Worker](./manual-abot-recon-container-build.md)。
 
 ```bash
-docker compose -p gussian -f docker/compose-gussian.yml -f docker/compose-abot.yml up -d --build
+docker compose -p gussian -f docker/compose-gussian.yml -f docker/compose-abot.yml up -d abot-worker
 ```
 
 该覆盖文件只新增 `abot-worker`，并给主 API 注入 `ABOT_RECON_URL=http://abot-worker:8091`；现有 Brush/COLMAP 容器仍使用原来的 CUDA 12.4 镜像和生产命令。两个容器共享 `gaussian-data`，因此 Worker 可以读取主 API 保存的视频，并把 `preview/*.ply` 写回同一个任务目录，但 Python、PyTorch 和 CUDA 用户态库完全隔离。
@@ -107,7 +107,7 @@ docker compose -p gussian -f docker/compose-gussian.yml -f docker/compose-abot.y
 ```bash
 docker compose -p gussian -f docker/compose-gussian.yml -f docker/compose-abot.yml ps
 docker compose -p gussian -f docker/compose-gussian.yml -f docker/compose-abot.yml logs -f abot-worker
-curl -f http://127.0.0.1:${ABOT_RECON_PORT:-8091}/health
+curl -f http://127.0.0.1:${ABOT_RECON_PORT:-8081}/health
 ```
 
 浏览器进入“流式扫描”，上传视频后点击“开始扫描”（当前 POC 固定走 ABot 路线）。视频保留在 `gaussian-data`，主 API 通过 Worker HTTP 接口轮询进度并继续向浏览器发送 SSE；ABot 失败不会覆盖 `output/final.ply`。

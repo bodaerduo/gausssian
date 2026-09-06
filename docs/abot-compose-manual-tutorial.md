@@ -187,7 +187,7 @@ docker compose -p gussian \
 检查 Worker 健康状态和容器间网络：
 
 ```bash
-curl -f http://127.0.0.1:8091/health
+curl -f http://127.0.0.1:${ABOT_RECON_PORT:-8081}/health
 
 docker compose -p gussian \
   -f docker/compose-gussian.yml \

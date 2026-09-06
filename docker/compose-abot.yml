@@ -35,7 +35,9 @@ services:
     expose:
       - "8091"
     ports:
-      - "${ABOT_RECON_PORT:-8091}:8091"
+      # Host ports are allocated sequentially: 8080 (web) -> 8081 (ABot).
+      # Container-to-container calls continue to use http://abot-worker:8091.
+      - "${ABOT_RECON_PORT:-8081}:8091"
     runtime: nvidia
     restart: unless-stopped
 
