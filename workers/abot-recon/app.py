@@ -164,7 +164,31 @@ def transform_points(points: np.ndarray, transform: np.ndarray) -> np.ndarray:
     return (homogeneous @ transform.T)[:, :3].reshape(points.shape)
 
 
-def publish_preview_batch(job_id: str, result: Any, preview_dir: Path, preview_index: int, frame_offset: int, total_frames: int, accumulated: list[np.ndarray], trajectory: list[list[float]], global_anchor: np.ndarray | None) -> tuple[int, np.ndarray | None]:
+def source_rgb_colors(frames: list[Path], point_maps: np.ndarray) -> np.ndarray | None:
+    """Sample source-frame RGB values at the same pixels as the point map."""
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    height, width = point_maps.shape[1:3]
+    colors: list[np.ndarray] = []
+    for frame in frames[:len(point_maps)]:
+        with Image.open(frame) as image:
+            rgb = np.asarray(image.convert("RGB").resize((width, height), Image.Resampling.BILINEAR), dtype=np.uint8)
+        colors.append(rgb[::POINT_STRIDE, ::POINT_STRIDE].reshape(-1, 3))
+    if not colors:
+        return None
+    sampled = np.concatenate(colors, axis=0)
+    expected = len(point_maps) * len(point_maps[0, ::POINT_STRIDE, ::POINT_STRIDE].reshape(-1, 3))
+    return sampled if sampled.shape[0] == expected else None
+
+
+def pseudo_rgb_colors(points: np.ndarray) -> np.ndarray:
+    span = np.max(np.abs(points), axis=0) if len(points) else np.ones(3)
+    return np.clip((points / np.maximum(span, 1e-6) + 1) * 127.5, 0, 255).astype(np.uint8)
+
+
+def publish_preview_batch(job_id: str, result: Any, frames: list[Path], preview_dir: Path, preview_index: int, frame_offset: int, total_frames: int, accumulated: list[np.ndarray], accumulated_colors: list[np.ndarray], trajectory: list[list[float]], global_anchor: np.ndarray | None) -> tuple[int, np.ndarray | None]:
     points_value = result.world_points if result.world_points is not None else result.local_points
     if points_value is None:
         raise ValueError("ABot 未返回点图")
@@ -177,11 +201,12 @@ def publish_preview_batch(job_id: str, result: Any, preview_dir: Path, preview_i
     points = point_maps[:, ::POINT_STRIDE, ::POINT_STRIDE].reshape(-1, 3)
     transformed = transform_points(points, alignment)
     accumulated.append(transformed)
+    colors = source_rgb_colors(frames, point_maps)
+    accumulated_colors.append(colors if colors is not None else pseudo_rgb_colors(transformed))
     merged = np.concatenate(accumulated, axis=0)
-    span = np.max(np.abs(merged), axis=0) if len(merged) else np.ones(3)
-    colors = np.tile(np.clip((merged / np.maximum(span, 1e-6) + 1) * 127.5, 0, 255).astype(np.uint8), (1, 1))
+    merged_colors = np.concatenate(accumulated_colors, axis=0)
     preview_name = f"points-{preview_index + 1:04d}.ply"
-    count = write_ply(preview_dir / preview_name, merged, colors)
+    count = write_ply(preview_dir / preview_name, merged, merged_colors)
     confidence = None
     if result.confidence is not None:
         confidence = round(float(result.confidence.detach().float().mean().cpu()), 4)
@@ -227,6 +252,7 @@ def run_job(job_id: str, request: JobRequest) -> None:
         batches = iter_frame_batches(source, work_dir, request.quality)
         model_instance = load_model()
         accumulated: list[np.ndarray] = []
+        accumulated_colors: list[np.ndarray] = []
         trajectory: list[list[float]] = []
         global_anchor: np.ndarray | None = None
         preview_index = 0
@@ -236,7 +262,7 @@ def run_job(job_id: str, request: JobRequest) -> None:
             if not frames:
                 continue
             result = model_instance.infer(frames, output_local_points=True, output_world_points=True, output_confidence=True, loop_closure=False)
-            _, global_anchor = publish_preview_batch(job_id, result, preview_dir, preview_index, frame_offset, total_hint, accumulated, trajectory, global_anchor)
+            _, global_anchor = publish_preview_batch(job_id, result, frames, preview_dir, preview_index, frame_offset, total_hint, accumulated, accumulated_colors, trajectory, global_anchor)
             preview_index += 1
             seen_frames = frame_offset + len(frames)
             if seen_frames >= MAX_FRAMES:
