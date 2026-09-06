@@ -23,7 +23,6 @@ export default function StreamingScanPage() {
   const [currentTime, setCurrentTime] = useState(0);
   const [scanRange, setScanRange] = useState(64);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [jobId, setJobId] = useState<string>();
   const [previewUrl, setPreviewUrl] = useState<string>();
   const [cameraPose, setCameraPose] = useState<number[][]>();
   const [workerMessage, setWorkerMessage] = useState('ABot Worker 待连接');
@@ -54,7 +53,6 @@ export default function StreamingScanPage() {
     setIsPlaying(false);
     setPreviewUrl(undefined);
     setCameraPose(undefined);
-    setJobId(undefined);
     setWorkerMessage('视频已就绪');
   };
 
@@ -88,7 +86,6 @@ export default function StreamingScanPage() {
       const response = await fetch(`${API_ROOT}/api/v1/reconstructions`, { method: 'POST', body: form });
       if (!response.ok) { const payload = await response.json().catch(() => undefined) as { detail?: string } | undefined; throw new Error(payload?.detail ?? 'ABot 服务未接受任务'); }
       const payload = await response.json() as { id: string };
-      setJobId(payload.id);
       setWorkerMessage('ABot 正在准备视频帧');
       eventsRef.current?.close();
       const events = new EventSource(`${API_ROOT}/api/v1/reconstructions/${payload.id}/events`);
@@ -112,8 +109,15 @@ export default function StreamingScanPage() {
     <main className="streaming-scan-page">
       <header className="streaming-scan-header">
         <div className="streaming-brand"><span className="streaming-pulse" /><div><span className="streaming-kicker">ABOT-RECON / STREAMING SCAN</span><h1>流式扫描</h1></div></div>
-        <div className="streaming-header-actions"><span className="streaming-worker-status"><i className={submitting ? 'online' : ''} /> {workerMessage}</span><button className="streaming-back" type="button" onClick={() => { window.location.href = '/'; }}>返回工作台</button></div>
+        <div className="streaming-header-actions"><button className="streaming-back" type="button" onClick={() => { window.location.href = '/'; }}>返回工作台</button></div>
       </header>
+
+      <section className="streaming-command-bar" aria-label="扫描控制">
+        <div className="streaming-command-main"><span className="streaming-worker-status"><i className={submitting ? 'online' : ''} /> {workerMessage}</span><strong>{fileName}</strong><span className="streaming-command-status">{status}</span></div>
+        <div className="streaming-command-actions"><button className="stream-start-button" type="button" disabled={!selectedFile || submitting} onClick={startScan}>{submitting ? '扫描中…' : '开始扫描'}</button><label className="stream-upload-button"><input type="file" accept="video/*,.m4v" onChange={chooseVideo} />更换视频</label></div>
+        <div className="streaming-command-meter"><div className="timeline-label"><span>扫描进度</span><strong>{Math.round(progress)}%</strong></div><input aria-label="视频播放进度" type="range" min="0" max={duration || 1} step="0.01" value={Math.min(currentTime, duration || 1)} onChange={(event) => seek(Number(event.target.value))} /></div>
+        <div className="streaming-command-meter streaming-command-range"><div className="timeline-label"><span>扫描范围</span><strong>{scanRange}%</strong></div><input aria-label="扫描范围" type="range" min="20" max="100" value={scanRange} onChange={(event) => setScanRange(Number(event.target.value))} /></div>
+      </section>
 
       <section className="streaming-stage" aria-label="视频与扫描预览">
         <div className="stream-pane video-pane">
@@ -137,13 +141,6 @@ export default function StreamingScanPage() {
         </div>
       </section>
 
-      <section className="streaming-controls">
-        <div className="stream-timeline"><div className="timeline-label"><span>扫描进度</span><strong>{Math.round(progress)}%</strong></div><input aria-label="视频播放进度" type="range" min="0" max={duration || 1} step="0.01" value={Math.min(currentTime, duration || 1)} onChange={(event) => seek(Number(event.target.value))} /><div className="timeline-ticks"><span>开始</span><span>视频播放中 · 点云同步生成</span><span>结束</span></div></div>
-        <div className="range-control"><div className="timeline-label"><span>扫描范围</span><strong>{scanRange}%</strong></div><input aria-label="扫描范围" type="range" min="20" max="100" value={scanRange} onChange={(event) => setScanRange(Number(event.target.value))} /><small>拖动调整当前查看区域大小</small></div>
-      </section>
-
-      <footer className="streaming-footer"><span>ABot-Recon POC · 固定 12 帧局部上下文</span><span>{jobId ? `任务 ${jobId}` : '输出：轨迹 / 点图 / 置信度 / 普通点云预览'}</span><span>最终 Gaussian 仍由 Brush 生产</span><button className="stream-start-button" type="button" disabled={!selectedFile || submitting} onClick={startScan}>{submitting ? '扫描中…' : '开始扫描'}</button><label className="stream-upload-button"><input type="file" accept="video/*,.m4v" onChange={chooseVideo} />更换视频</label></footer>
-      <span className="streaming-api-hint">{API_ROOT ? `API ${API_ROOT}` : 'API 同源'} · preview surface</span>
     </main>
   );
 }
