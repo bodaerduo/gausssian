@@ -28,9 +28,17 @@ from pydantic import BaseModel
 
 
 QUALITY = {
-    "fast": {"fps": 2, "video_width": 854, "video_height": 480, "steps": 10_000, "max_resolution": 480, "max_splats": 2_000_000},
+    "fast": {"fps": 3, "video_width": 1280, "video_height": 720, "steps": 12_000, "max_resolution": 720, "max_splats": 2_500_000},
     "balanced": {"fps": 4, "video_width": 1280, "video_height": 720, "steps": 30_000, "max_resolution": 720, "max_splats": 5_000_000},
     "high": {"fps": 6, "video_width": 1920, "video_height": 1080, "steps": 50_000, "max_resolution": 1080, "max_splats": 8_000_000},
+}
+PARAMETER_LIMITS = {
+    "fps": (1, 30),
+    "video_width": (320, 1920),
+    "video_height": (240, 1920),
+    "steps": (1_000, 100_000),
+    "max_resolution": (240, 1920),
+    "max_splats": (100_000, 20_000_000),
 }
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".webm", ".m4v"}
@@ -58,6 +66,22 @@ os.environ.setdefault("CUBECL_WGPU_DEFAULT_DEVICE", CUBECL_WGPU_DEFAULT_DEVICE)
 MAX_UPLOAD_BYTES = env_int("GAUSSIAN_MAX_UPLOAD_BYTES", 2 * 1024 * 1024 * 1024)
 MAX_WORKERS = env_int("GAUSSIAN_MAX_WORKERS", 1)
 MATCHER = os.getenv("COLMAP_MATCHER", "exhaustive")
+
+
+def reconstruction_config(quality: str, overrides: dict[str, int | None] | None = None) -> dict[str, int]:
+    config = {key: int(value) for key, value in QUALITY[quality].items()}
+    for key, value in (overrides or {}).items():
+        if value is None:
+            continue
+        minimum, maximum = PARAMETER_LIMITS[key]
+        if value < minimum or value > maximum:
+            raise HTTPException(status_code=400, detail=f"{key} 必须在 {minimum}–{maximum} 范围内")
+        config[key] = value
+    if config["video_width"] > VIDEO_MAX_DIMENSION or config["video_height"] > VIDEO_MAX_DIMENSION:
+        raise HTTPException(status_code=400, detail=f"视频分辨率不能超过服务器上限 {VIDEO_MAX_DIMENSION}px")
+    if config["max_resolution"] > max(config["video_width"], config["video_height"]):
+        raise HTTPException(status_code=400, detail="训练分辨率不能高于输入视频的长边")
+    return config
 
 
 class ReconstructionUpdate(BaseModel):
@@ -406,8 +430,8 @@ def optimization_entry(job_id: str, version: int, decimate: str | None, harmonic
         write_state(job_id, state)
 
 
-def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name: str) -> None:
-    config = QUALITY[quality_name]
+def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name: str, config: dict[str, int] | None = None) -> None:
+    config = config or QUALITY[quality_name]
     video_width = min(config["video_width"], VIDEO_MAX_DIMENSION)
     video_height = min(config["video_height"], VIDEO_MAX_DIMENSION)
     root = job_dir(job_id)
@@ -542,7 +566,7 @@ def run_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name:
     )
 
 
-def run_addon_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name: str, route: str) -> None:
+def run_addon_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name: str, route: str, config: dict[str, int] | None = None) -> None:
     """Run an optional external worker without importing its Python environment."""
     route_name = next(item["name"] for item in PRODUCT_ROUTES if item["id"] == route)
     preview_dir = job_dir(job_id) / "preview"
@@ -554,7 +578,7 @@ def run_addon_pipeline(job_id: str, source_kind: str, source_path: Path, quality
     service_key = "ABOT_RECON_URL" if route == "abot_recon_poc" else "LINGBOT_MAP_URL"
     service_url = os.getenv(service_key, "").strip().rstrip("/")
     if service_url:
-        run_remote_addon_pipeline(job_id, source_kind, source_path, quality_name, route, service_url, output_dir, preview_dir)
+        run_remote_addon_pipeline(job_id, source_kind, source_path, quality_name, route, service_url, output_dir, preview_dir, config)
         return
     command_template = os.getenv(command_key, "").strip()
     if not command_template:
@@ -565,6 +589,12 @@ def run_addon_pipeline(job_id: str, source_kind: str, source_path: Path, quality
         output=str(output_dir),
         preview=str(preview_dir),
         quality=quality_name,
+        fps=(config or QUALITY[quality_name])["fps"],
+        video_width=(config or QUALITY[quality_name])["video_width"],
+        video_height=(config or QUALITY[quality_name])["video_height"],
+        steps=(config or QUALITY[quality_name])["steps"],
+        max_resolution=(config or QUALITY[quality_name])["max_resolution"],
+        max_splats=(config or QUALITY[quality_name])["max_splats"],
     )
     append_log(job_id, f"\n[{route_name}] 启动外部 Worker：{command}\n")
     process = subprocess.Popen(
@@ -596,7 +626,7 @@ def json_http(url: str, *, method: str = "GET", payload: dict[str, Any] | None =
         raise RuntimeError(f"Worker API 请求失败：{url}") from exc
 
 
-def run_remote_addon_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name: str, route: str, service_url: str, output_dir: Path, preview_dir: Path) -> None:
+def run_remote_addon_pipeline(job_id: str, source_kind: str, source_path: Path, quality_name: str, route: str, service_url: str, output_dir: Path, preview_dir: Path, config: dict[str, int] | None = None) -> None:
     route_name = next(item["name"] for item in PRODUCT_ROUTES if item["id"] == route)
     submitted = json_http(
         f"{service_url}/v1/jobs",
@@ -608,6 +638,7 @@ def run_remote_addon_pipeline(job_id: str, source_kind: str, source_path: Path, 
             "output_dir": str(output_dir),
             "preview_dir": str(preview_dir),
             "quality": quality_name,
+            "parameters": config or QUALITY[quality_name],
         },
     )
     worker_job_id = str(submitted.get("id", ""))
@@ -641,12 +672,12 @@ def run_remote_addon_pipeline(job_id: str, source_kind: str, source_path: Path, 
         time.sleep(0.75)
 
 
-def worker_entry(job_id: str, source_kind: str, source_path: Path, quality_name: str, route: str = "brush_static") -> None:
+def worker_entry(job_id: str, source_kind: str, source_path: Path, quality_name: str, route: str = "brush_static", config: dict[str, int] | None = None) -> None:
     try:
         if route == "brush_static":
-            run_pipeline(job_id, source_kind, source_path, quality_name)
+            run_pipeline(job_id, source_kind, source_path, quality_name, config)
         else:
-            run_addon_pipeline(job_id, source_kind, source_path, quality_name, route)
+            run_addon_pipeline(job_id, source_kind, source_path, quality_name, route, config)
     except JobCancelled:
         state = read_state(job_id) or {}
         emit(
@@ -717,9 +748,26 @@ async def create_reconstruction(
     images: list[UploadFile] | None = File(default=None),
     quality: str = Form(default="balanced"),
     route: str = Form(default="brush_static"),
+    fps: int | None = Form(default=None),
+    video_width: int | None = Form(default=None),
+    video_height: int | None = Form(default=None),
+    steps: int | None = Form(default=None),
+    max_resolution: int | None = Form(default=None),
+    max_splats: int | None = Form(default=None),
 ) -> dict[str, Any]:
     if quality not in QUALITY:
         raise HTTPException(status_code=400, detail=f"quality 必须是：{', '.join(QUALITY)}")
+    config = reconstruction_config(
+        quality,
+        {
+            "fps": fps,
+            "video_width": video_width,
+            "video_height": video_height,
+            "steps": steps,
+            "max_resolution": max_resolution,
+            "max_splats": max_splats,
+        },
+    )
     selected_route = product_route(route)
     image_uploads = images or []
     has_video = videos is not None and bool(videos.filename)
@@ -738,7 +786,7 @@ async def create_reconstruction(
     JOB_CANCEL_EVENTS[job_id] = threading.Event()
     JOB_PAUSE_EVENTS[job_id] = threading.Event()
     created_at = now()
-    state = {"id": job_id, "status": "queued", "progress": 0, "phase": "素材检查", "message": "任务已排队", "quality": quality, "route": selected_route["id"], "asset_type": selected_route["asset_type"], "created_at": created_at, "updated_at": created_at, "phase_started_at": created_at, "stage_durations": {}}
+    state = {"id": job_id, "status": "queued", "progress": 0, "phase": "素材检查", "message": "任务已排队", "quality": quality, "parameters": config, "route": selected_route["id"], "asset_type": selected_route["asset_type"], "created_at": created_at, "updated_at": created_at, "phase_started_at": created_at, "stage_durations": {}}
     state_path(job_id).write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
     events_path(job_id).write_text(json.dumps({"type": "queued", "id": job_id, "route": selected_route["id"], "asset_type": selected_route["asset_type"], "phase": "素材检查", "progress": 0, "message": "任务已排队"}, ensure_ascii=False) + "\n", encoding="utf-8")
 
@@ -766,8 +814,8 @@ async def create_reconstruction(
         cleanup_job_runtime(job_id)
         raise
 
-    JOB_FUTURES[job_id] = EXECUTOR.submit(worker_entry, job_id, source_kind, source_path, quality, selected_route["id"])
-    return {"id": job_id, "status": "queued", "route": selected_route["id"], "asset_type": selected_route["asset_type"], "events_url": f"/api/v1/reconstructions/{job_id}/events", "download_url": f"/api/v1/reconstructions/{job_id}/download/{job_id}.ply"}
+    JOB_FUTURES[job_id] = EXECUTOR.submit(worker_entry, job_id, source_kind, source_path, quality, selected_route["id"], config)
+    return {"id": job_id, "status": "queued", "quality": quality, "parameters": config, "route": selected_route["id"], "asset_type": selected_route["asset_type"], "events_url": f"/api/v1/reconstructions/{job_id}/events", "download_url": f"/api/v1/reconstructions/{job_id}/download/{job_id}.ply"}
 
 
 @app.get("/api/v1/reconstructions")

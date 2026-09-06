@@ -5,23 +5,32 @@ services:
       ABOT_RECON_URL: http://abot-worker:8091
 
   abot-worker:
-    build:
-      context: ..
-      dockerfile: workers/abot-recon/Dockerfile
-      args:
-        ABOT_RECON_REF: ${ABOT_RECON_REF:-main}
-        CUDA_IMAGE: ${ABOT_RECON_CUDA_IMAGE:-nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04}
+    image: ${ABOT_RECON_IMAGE:-gaussian:deps}
+    working_dir: /opt
+    command:
+      - bash
+      - -lc
+      - |
+        mkdir -p /opt/abot-worker
+        if [ "$${ABOT_RECON_MANUAL:-true}" = "true" ]; then
+          echo "ABot manual mode: install dependencies, verify GPU, then docker commit this container."
+          exec sleep infinity
+        fi
+        exec "$${ABOT_RECON_PYTHON:-/opt/venvs/abot/bin/python}" -m uvicorn app:app --app-dir /opt/abot-worker --host 0.0.0.0 --port 8091
     environment:
       ABOT_RECON_DATA_ROOT: /app/runtime/data
       ABOT_RECON_MODEL: ${ABOT_RECON_MODEL:-acvlab/ABot-Recon}
       ABOT_RECON_DEVICE: cuda
+      ABOT_RECON_MANUAL: ${ABOT_RECON_MANUAL:-true}
+      ABOT_RECON_PYTHON: ${ABOT_RECON_PYTHON:-/opt/venvs/abot/bin/python}
       ABOT_RECON_MAX_FRAMES: ${ABOT_RECON_MAX_FRAMES:-22000}
       ABOT_RECON_PREVIEW_FRAME_STRIDE: ${ABOT_RECON_PREVIEW_FRAME_STRIDE:-8}
       ABOT_RECON_POINT_STRIDE: ${ABOT_RECON_POINT_STRIDE:-8}
       NVIDIA_VISIBLE_DEVICES: ${ABOT_RECON_GPU:-all}
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
-      - gaussian-data:/app/runtime/data
+      - ../runtime/data:/app/runtime/data
+      - ../workers/abot-recon:/opt/abot-worker-src:ro
       - abot-huggingface:/root/.cache/huggingface
     expose:
       - "8091"

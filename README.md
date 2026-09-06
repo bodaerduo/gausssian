@@ -45,6 +45,7 @@ docker compose -p gussian -f docker/compose-gussian.yml up -d --build
 - [`docs/视频重建Gaussian方案对比与推荐.md`](./docs/视频重建Gaussian方案对比与推荐.md)
 - [`docs/abot-streaming-scan-plan.md`](./docs/abot-streaming-scan-plan.md)
 - [`docs/manual-abot-recon-container-build.md`](./docs/manual-abot-recon-container-build.md)：基于现有 CUDA 12.4 devel 镜像手动安装 ABot-Recon Worker 依赖。
+- [`docs/abot-compose-manual-tutorial.md`](./docs/abot-compose-manual-tutorial.md)：仅使用 `compose-abot.yml` 手动安装、下载模型并启动 ABot Worker。
 
 如需让局域网浏览器通过 HTTPS 使用 SuperSplat WebGPU 编辑器，可执行 `TLS_IP=192.168.2.11 ./scripts/setup-self-signed-https.sh`，再启动 `docker/compose-gussian.yml`；具体步骤见 [`docs/container-deployment.md`](./docs/container-deployment.md)。
 

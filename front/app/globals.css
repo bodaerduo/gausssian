@@ -104,6 +104,13 @@ h2 { margin: 0; color: var(--ink); font-size: 13px; font-weight: 760; letter-spa
 .setting-row strong { color: var(--ink); font-size: 11px; font-weight: 700; }
 .setting-row small { margin-top: 5px; color: var(--ink-faint); font-size: 10px; }
 .select-wrap { position: relative; min-width: 176px; }
+.advanced-settings { margin: 4px 0 12px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.advanced-settings summary { padding: 12px 0; color: var(--ink-soft); cursor: pointer; font-size: 10px; font-weight: 700; list-style-position: outside; }
+.parameter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0 0 10px 14px; }
+.parameter-grid label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--ink-faint); font-size: 9px; }
+.parameter-grid input { width: 86px; padding: 7px 6px; border: 1px solid var(--line-strong); border-radius: 6px; color: var(--ink-soft); background: #fbfcfe; font-size: 10px; text-align: right; }
+.parameter-grid input:focus { border-color: var(--cyan); outline: none; box-shadow: 0 0 0 3px rgba(21, 207, 192, .12); }
+.advanced-hint { display: block; padding: 0 0 12px 14px; color: var(--ink-faint); font-size: 9px; line-height: 1.5; }
 .select-wrap select { width: 100%; padding: 9px 28px 9px 10px; appearance: none; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--ink-soft); background: #fbfcfe; font-size: 10px; outline: none; }
 .select-wrap select:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(21, 207, 192, .12); }
 .select-wrap > span { position: absolute; top: 9px; right: 10px; color: var(--ink-faint); pointer-events: none; }
@@ -1109,6 +1116,11 @@ body { font-family: "Fira Sans", Inter, "PingFang SC", "Microsoft YaHei", ui-san
 .select-wrap select { border-color: #b8c9da !important; color: #284d72 !important; background: #f8fbfe !important; }
 .toggle { background: #b8c9da !important; }
 .toggle.on { background: linear-gradient(90deg, #1769aa, #315fc4) !important; }
+.advanced-settings { border-color: #d5e0ec !important; }
+.advanced-settings summary { color: #284d72 !important; }
+.parameter-grid input { border-color: #b8c9da !important; color: #284d72 !important; background: #f8fbfe !important; }
+.parameter-grid input:focus { border-color: #1769aa !important; box-shadow: 0 0 0 3px rgba(23, 105, 170, .12) !important; }
+.advanced-hint { color: #7088a1 !important; }
 .action-row { border-color: #c7d7e6 !important; background: #f7fafd !important; box-shadow: 0 14px 30px rgba(44, 87, 128, .09) !important; }
 .action-meta { color: #7088a1 !important; }
 .start-button { color: #ffffff !important; background: linear-gradient(105deg, #1769aa, #315fc4) !important; box-shadow: 0 12px 25px rgba(23, 105, 170, .22) !important; }
@@ -1117,6 +1129,7 @@ body { font-family: "Fira Sans", Inter, "PingFang SC", "Microsoft YaHei", ui-san
 .progress-track span { background: linear-gradient(90deg, #1769aa, #3b82c4) !important; }
 .stage-row { color: #7088a1 !important; }
 .stage-row.current { color: #284d72 !important; }
+@media (max-width: 700px) { .parameter-grid { grid-template-columns: 1fr; } }
 .stage-row.done { color: #1769aa !important; }
 .stage-marker { border-color: #b8c9da !important; color: #7088a1 !important; background: #f4f8fc !important; }
 .stage-marker.done, .stage-marker.current { color: #1769aa !important; border-color: #8db7d6 !important; background: #e8f3fb !important; }
