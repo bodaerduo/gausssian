@@ -5,7 +5,7 @@ services:
       ABOT_RECON_URL: http://abot-worker:8091
 
   abot-worker:
-    image: ${ABOT_RECON_IMAGE:-gaussian:deps}
+    image: ${ABOT_RECON_IMAGE:-gaussian/abot-recon:cuda12.4-abot-20260906}
     working_dir: /opt
     command:
       - bash
@@ -21,7 +21,7 @@ services:
       ABOT_RECON_DATA_ROOT: /app/runtime/data
       ABOT_RECON_MODEL: ${ABOT_RECON_MODEL:-/models/abot-recon}
       ABOT_RECON_DEVICE: cuda
-      ABOT_RECON_MANUAL: ${ABOT_RECON_MANUAL:-true}
+      ABOT_RECON_MANUAL: ${ABOT_RECON_MANUAL:-false}
       ABOT_RECON_PYTHON: ${ABOT_RECON_PYTHON:-/opt/venvs/abot/bin/python}
       ABOT_RECON_MAX_FRAMES: ${ABOT_RECON_MAX_FRAMES:-22000}
       ABOT_RECON_PREVIEW_FRAME_STRIDE: ${ABOT_RECON_PREVIEW_FRAME_STRIDE:-8}

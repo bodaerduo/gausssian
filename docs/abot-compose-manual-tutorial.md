@@ -13,7 +13,7 @@ app → http://abot-worker:8091 → ABot-Recon → preview/*.ply
 ## 前提
 
 - 当前目录：`/mnt/data/tk-koc1/tk-server/gaussian`
-- 已存在镜像：`gaussian:deps`
+- 已存在镜像：`gaussian/abot-recon:cuda12.4-abot-20260906`
 - 主服务由 `docker/compose-gussian.yml` 启动，服务名为 `app`
 - 宿主机已安装 NVIDIA Container Toolkit
 - GPU 容器内可以执行 `nvidia-smi`
@@ -38,23 +38,18 @@ mkdir -p runtime/models/abot-recon
 # 将模型配置和权重文件复制到 runtime/models/abot-recon/
 ```
 
-## 2. 启动手动安装模式
+## 2. 启动 ABot Worker
 
-`compose-abot.yml` 默认使用 `gaussian:deps`，并通过 `ABOT_RECON_MANUAL=true` 让 Worker 保持休眠，便于手动安装：
+`compose-abot.yml` 已内置正式镜像、模型挂载目录、正式模式和 8081 端口，正常启动不需要额外 `export`：
 
 ```bash
-export ABOT_RECON_IMAGE=gaussian:deps
-export ABOT_RECON_MANUAL=true
-export ABOT_RECON_MODEL_DIR="$PWD/runtime/models/abot-recon"
-export ABOT_RECON_MODEL=/models/abot-recon
-
 docker compose -p gussian \
   -f docker/compose-gussian.yml \
   -f docker/compose-abot.yml \
   up -d abot-worker
 ```
 
-这里故意只启动 `abot-worker`。`app` 已经由 `compose-gussian.yml` 正常运行，安装 ABot 不需要重启它。`compose-abot.yml` 中的 `app.environment` 只是为后续联调提供 `ABOT_RECON_ENABLED` 和 `ABOT_RECON_URL` 配置；只有当现有 `app` 尚未带这两个环境变量时，才需要另行安排一次 `app` 重建。
+这里故意只启动 `abot-worker`。`app` 已经由 `compose-gussian.yml` 正常运行，不需要重启它。若需要临时手动安装，编辑该 Compose 文件中的镜像和 `ABOT_RECON_MANUAL` 默认值，完成 `docker commit` 后恢复正式值。
 
 确认容器状态：
 
@@ -137,8 +132,6 @@ ls -lah /models/abot-recon
 使用本地路径加载，不访问 Hugging Face：
 
 ```bash
-export ABOT_RECON_MODEL=/models/abot-recon
-
 /opt/venvs/abot/bin/python - <<'PY'
 from abot_recon import ABotRecon
 
