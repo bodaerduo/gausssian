@@ -828,7 +828,11 @@ def list_reconstructions() -> dict[str, list[dict[str, Any]]]:
                 continue
             state = read_state(path.name)
             if state:
-                state["modelUrl"] = f"/api/v1/reconstructions/{path.name}/download/{path.name}.ply"
+                if state.get("route", "brush_static") == "brush_static":
+                    state["modelUrl"] = f"/api/v1/reconstructions/{path.name}/download/{path.name}.ply"
+                else:
+                    state.pop("modelUrl", None)
+                    state.setdefault("preview_url", f"/api/v1/reconstructions/{path.name}/preview")
                 jobs.append(state)
     jobs.sort(key=lambda item: item.get("created_at", ""), reverse=True)
     return {"jobs": jobs}

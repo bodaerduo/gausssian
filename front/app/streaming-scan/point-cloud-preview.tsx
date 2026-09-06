@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 
+type PreviewManifest = { assets?: Array<{ name?: string; url?: string }> };
+
 export function PointCloudPreview({ modelUrl, range }: { modelUrl: string; range: number }) {
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const geometryRef = useRef<THREE.BufferGeometry>();
@@ -79,4 +81,26 @@ export function PointCloudPreview({ modelUrl, range }: { modelUrl: string; range
   useEffect(() => { rangeRef.current = range; geometryRef.current?.setDrawRange(0, Math.max(1, Math.floor(countRef.current * range / 100))); }, [range]);
 
   return <div className="stream-point-viewer"><div className="stream-point-canvas" ref={canvasHostRef} />{state !== 'ready' && <div className="stream-point-state">{state === 'loading' ? '加载实时点云…' : '点云预览加载失败'}</div>}</div>;
+}
+
+export function PointCloudAssetPreview({ previewUrl, range }: { previewUrl: string; range: number }) {
+  const [asset, setAsset] = useState<{ url?: string; error?: string }>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(previewUrl, { cache: 'no-store' })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('预览资产清单不可用');
+        const manifest = await response.json() as PreviewManifest;
+        const assets = (manifest.assets ?? []).filter((asset) => asset.url && asset.name?.toLowerCase().endsWith('.ply'));
+        const latest = assets.at(-1);
+        if (!latest?.url) throw new Error('尚未生成点云预览');
+        if (!cancelled) setAsset({ url: new URL(latest.url, previewUrl).toString() });
+      })
+      .catch((cause: unknown) => { if (!cancelled) setAsset({ error: cause instanceof Error ? cause.message : '预览资产加载失败' }); });
+    return () => { cancelled = true; };
+  }, [previewUrl]);
+
+  if (!asset.url) return <div className="stream-point-viewer"><div className="stream-point-state">{asset.error || '正在读取点云预览…'}</div></div>;
+  return <PointCloudPreview modelUrl={asset.url} range={range} />;
 }
