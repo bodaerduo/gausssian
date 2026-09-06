@@ -6,12 +6,26 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 
 type PreviewManifest = { assets?: Array<{ name?: string; url?: string }> };
+type CameraPose = number[][];
 
-export function PointCloudPreview({ modelUrl, range }: { modelUrl: string; range: number }) {
+function applyCameraPose(camera: THREE.PerspectiveCamera, controls: OrbitControls, pose: CameraPose, target: THREE.Vector3) {
+  if (pose.length !== 4 || pose.some((row) => row.length !== 4 || row.some((value) => !Number.isFinite(value)))) return;
+  const matrix = new THREE.Matrix4().set(...pose.flat() as [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number]);
+  matrix.decompose(camera.position, camera.quaternion, camera.scale);
+  camera.updateMatrixWorld(true);
+  controls.target.copy(target);
+  controls.update();
+}
+
+export function PointCloudPreview({ modelUrl, range, cameraPose }: { modelUrl: string; range: number; cameraPose?: CameraPose }) {
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const geometryRef = useRef<THREE.BufferGeometry>();
   const countRef = useRef(0);
   const rangeRef = useRef(range);
+  const cameraPoseRef = useRef(cameraPose);
+  const cameraRef = useRef<THREE.PerspectiveCamera>();
+  const controlsRef = useRef<OrbitControls>();
+  const targetRef = useRef(new THREE.Vector3());
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
 
   useEffect(() => {
@@ -29,6 +43,8 @@ export function PointCloudPreview({ modelUrl, range }: { modelUrl: string; range
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     host.appendChild(renderer.domElement);
     const controls = new OrbitControls(camera, renderer.domElement);
+    cameraRef.current = camera;
+    controlsRef.current = controls;
     controls.enableDamping = true;
     controls.dampingFactor = .08;
     controls.screenSpacePanning = true;
@@ -47,7 +63,8 @@ export function PointCloudPreview({ modelUrl, range }: { modelUrl: string; range
     new PLYLoader().load(modelUrl, (geometry) => {
       if (cancelled) { geometry.dispose(); return; }
       geometry.computeBoundingSphere();
-      geometry.center();
+      const sceneCenter = geometry.boundingSphere?.center.clone() ?? new THREE.Vector3();
+      if (!cameraPoseRef.current) geometry.center();
       const total = geometry.getAttribute('position')?.count ?? 0;
       geometry.setDrawRange(0, Math.max(1, Math.floor(total * rangeRef.current / 100)));
       geometryRef.current = geometry;
@@ -57,12 +74,14 @@ export function PointCloudPreview({ modelUrl, range }: { modelUrl: string; range
       scene.add(points);
       const radius = geometry.boundingSphere?.radius || 1;
       material.size = Math.max(.012, Math.min(.09, radius * .003));
+      targetRef.current.copy(cameraPoseRef.current ? sceneCenter : new THREE.Vector3());
       camera.position.set(radius * .7, radius * .45, radius * 2.3);
       camera.near = Math.max(.001, radius / 1000);
       camera.far = Math.max(100, radius * 20);
       camera.updateProjectionMatrix();
-      controls.target.set(0, 0, 0);
-      controls.update();
+      controls.target.copy(targetRef.current);
+      if (cameraPoseRef.current) applyCameraPose(camera, controls, cameraPoseRef.current, targetRef.current);
+      else controls.update();
       setState('ready');
     }, undefined, () => { if (!cancelled) setState('error'); });
 
@@ -71,6 +90,8 @@ export function PointCloudPreview({ modelUrl, range }: { modelUrl: string; range
       window.cancelAnimationFrame(frame);
       observer.disconnect();
       controls.dispose();
+      cameraRef.current = undefined;
+      controlsRef.current = undefined;
       geometryRef.current = undefined;
       countRef.current = 0;
       scene.traverse((object) => { if (object instanceof THREE.Points) { object.geometry.dispose(); object.material.dispose(); } });
@@ -79,6 +100,7 @@ export function PointCloudPreview({ modelUrl, range }: { modelUrl: string; range
     };
   }, [modelUrl]);
 
+  useEffect(() => { cameraPoseRef.current = cameraPose; if (cameraPose && cameraRef.current && controlsRef.current) applyCameraPose(cameraRef.current, controlsRef.current, cameraPose, targetRef.current); }, [cameraPose]);
   useEffect(() => { rangeRef.current = range; geometryRef.current?.setDrawRange(0, Math.max(1, Math.floor(countRef.current * range / 100))); }, [range]);
 
   return <div className="stream-point-viewer"><div className="stream-point-canvas" ref={canvasHostRef} />{state !== 'ready' && <div className="stream-point-state">{state === 'loading' ? '加载实时点云…' : '点云预览加载失败'}</div>}</div>;

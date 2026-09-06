@@ -25,6 +25,7 @@ export default function StreamingScanPage() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [jobId, setJobId] = useState<string>();
   const [previewUrl, setPreviewUrl] = useState<string>();
+  const [cameraPose, setCameraPose] = useState<number[][]>();
   const [workerMessage, setWorkerMessage] = useState('ABot Worker 待连接');
   const [submitting, setSubmitting] = useState(false);
 
@@ -52,6 +53,7 @@ export default function StreamingScanPage() {
     setCurrentTime(0);
     setIsPlaying(false);
     setPreviewUrl(undefined);
+    setCameraPose(undefined);
     setJobId(undefined);
     setWorkerMessage('视频已就绪');
   };
@@ -92,8 +94,9 @@ export default function StreamingScanPage() {
       const events = new EventSource(`${API_ROOT}/api/v1/reconstructions/${payload.id}/events`);
       eventsRef.current = events;
       events.onmessage = (event) => {
-        const data = JSON.parse(event.data) as { type?: string; message?: string; preview_url?: string; progress?: number; point_count?: number };
+        const data = JSON.parse(event.data) as { type?: string; message?: string; preview_url?: string; progress?: number; point_count?: number; camera_pose?: number[][] };
         if (data.message) setWorkerMessage(data.message);
+        if (data.camera_pose) setCameraPose(data.camera_pose);
         if (data.preview_url?.endsWith('.ply')) setPreviewUrl(`${API_ROOT}${data.preview_url}?t=${Date.now()}`);
         if (data.type === 'completed' || data.type === 'failed') { events.close(); setSubmitting(false); }
       };
@@ -128,7 +131,7 @@ export default function StreamingScanPage() {
           <div ref={scanFrameRef} className="scan-frame" style={{ '--scan-range': `${scanRange}%`, '--scan-progress': `${progress}%` } as CSSProperties} onDoubleClick={() => enterFullscreen(scanFrameRef.current)}>
             <button className="stream-frame-fullscreen" type="button" onClick={() => enterFullscreen(scanFrameRef.current)} aria-label="模型全屏查看">全屏 ↗</button>
             <div className="scan-hud"><span>CAMERA TRAJECTORY · {pointCount.toLocaleString()} PTS</span><strong>{Math.round(progress)}%</strong></div>
-            {previewUrl ? <PointCloudPreview modelUrl={previewUrl} range={scanRange} /> : <><svg className="scan-cloud" viewBox="0 0 100 100" role="img" aria-label="实时点云预览"><defs><filter id="point-glow"><feGaussianBlur stdDeviation=".7" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter><linearGradient id="trajectory-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#43cfc2" /><stop offset="1" stopColor="#7368e8" /></linearGradient></defs><g className="point-cloud-points" filter="url(#point-glow)">{pointCloud.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r={point.r} fill={index % 7 === 0 ? '#7368e8' : '#39bfb8'} opacity={point.opacity} style={{ animationDelay: point.delay, '--point-depth': `${point.depth}px` } as CSSProperties} />)}</g><path className="cloud-axis" d="M50 12V89M16 51H85" /><path className="cloud-trajectory" d="M50 53 C43 48 42 39 49 35 S65 33 70 42 S67 62 57 67 S38 73 30 65" pathLength="1" /><circle className="cloud-camera" cx="50" cy="53" r="2.5" /><circle className="cloud-camera-halo" cx="50" cy="53" r="7" /></svg><div className="scan-empty-copy"><strong>{videoUrl ? '准备实时点云' : '等待视频输入'}</strong><span>{videoUrl ? '点击开始扫描，首个 ABot 预览生成后自动切换' : '当前页面先验证播放、时间轴和扫描范围交互'}</span></div></>}
+            {previewUrl ? <PointCloudPreview modelUrl={previewUrl} range={scanRange} cameraPose={cameraPose} /> : <><svg className="scan-cloud" viewBox="0 0 100 100" role="img" aria-label="实时点云预览"><defs><filter id="point-glow"><feGaussianBlur stdDeviation=".7" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter><linearGradient id="trajectory-gradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#43cfc2" /><stop offset="1" stopColor="#7368e8" /></linearGradient></defs><g className="point-cloud-points" filter="url(#point-glow)">{pointCloud.map((point, index) => <circle key={index} cx={point.x} cy={point.y} r={point.r} fill={index % 7 === 0 ? '#7368e8' : '#39bfb8'} opacity={point.opacity} style={{ animationDelay: point.delay, '--point-depth': `${point.depth}px` } as CSSProperties} />)}</g><path className="cloud-axis" d="M50 12V89M16 51H85" /><path className="cloud-trajectory" d="M50 53 C43 48 42 39 49 35 S65 33 70 42 S67 62 57 67 S38 73 30 65" pathLength="1" /><circle className="cloud-camera" cx="50" cy="53" r="2.5" /><circle className="cloud-camera-halo" cx="50" cy="53" r="7" /></svg><div className="scan-empty-copy"><strong>{videoUrl ? '准备实时点云' : '等待视频输入'}</strong><span>{videoUrl ? '点击开始扫描，首个 ABot 预览生成后自动切换' : '当前页面先验证播放、时间轴和扫描范围交互'}</span></div></>}
             <div className="scan-frame-label">ABOT / LOCAL CONTEXT 12F</div>
           </div>
         </div>

@@ -225,7 +225,8 @@ def publish_preview_batch(job_id: str, result: Any, frames: list[Path], preview_
     if result.confidence is not None:
         confidence = round(float(result.confidence.detach().float().mean().cpu()), 4)
     progress = round((frame_offset + len(point_maps)) / max(1, total_frames) * 90) + 8
-    add_event(job_id, progress=max(20, min(95, progress)), message=f"已生成第 {frame_offset + len(point_maps)} 帧点云", frame=frame_offset + len(point_maps), point_count=count, confidence=confidence, preview_url=f"/api/v1/reconstructions/{job_id}/preview/{preview_name}")
+    camera_pose = transformed_poses[-1].tolist() if len(transformed_poses) else None
+    add_event(job_id, progress=max(20, min(95, progress)), message=f"已生成第 {frame_offset + len(point_maps)} 帧点云", frame=frame_offset + len(point_maps), point_count=count, confidence=confidence, camera_pose=camera_pose, preview_url=f"/api/v1/reconstructions/{job_id}/preview/{preview_name}")
     (preview_dir / "trajectory.json").write_text(json.dumps({"poses": trajectory}, ensure_ascii=False), encoding="utf-8")
     return count, transformed_poses[-1] if len(transformed_poses) else global_anchor
 

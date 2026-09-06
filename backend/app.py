@@ -661,6 +661,7 @@ def run_remote_addon_pipeline(job_id: str, source_kind: str, source_path: Path, 
                 frame=event.get("frame"),
                 point_count=event.get("point_count"),
                 confidence=event.get("confidence"),
+                camera_pose=event.get("camera_pose"),
                 preview_url=event.get("preview_url"),
             )
         state = status.get("status")
