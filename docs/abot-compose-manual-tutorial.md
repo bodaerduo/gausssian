@@ -162,14 +162,12 @@ exit
 在宿主机提交当前 ABot 容器。模型权重位于宿主机挂载目录，不写进镜像：
 
 ```bash
-export ABOT_RECON_IMAGE=gaussian/abot-recon:cuda12.4-abot-20260906
-
 docker commit \
   --change 'CMD ["/opt/venvs/abot/bin/python", "-m", "uvicorn", "app:app", "--app-dir", "/opt/abot-worker", "--host", "0.0.0.0", "--port", "8091"]' \
   "$(docker compose -p gussian -f docker/compose-gussian.yml -f docker/compose-abot.yml ps -q abot-worker)" \
-  "$ABOT_RECON_IMAGE"
+  gaussian/abot-recon:cuda12.4-abot-20260906
 
-docker image inspect "$ABOT_RECON_IMAGE" --format '{{.RepoTags}} {{.Id}}'
+docker image inspect gaussian/abot-recon:cuda12.4-abot-20260906 --format '{{.RepoTags}} {{.Id}}'
 ```
 
 ## 8. 启动正式 ABot Worker
@@ -177,8 +175,6 @@ docker image inspect "$ABOT_RECON_IMAGE" --format '{{.RepoTags}} {{.Id}}'
 关闭手动模式，让 Compose 使用刚提交的镜像启动 Uvicorn：
 
 ```bash
-export ABOT_RECON_MANUAL=false
-
 docker compose -p gussian \
   -f docker/compose-gussian.yml \
   -f docker/compose-abot.yml \
@@ -188,7 +184,7 @@ docker compose -p gussian \
 检查 Worker 健康状态和容器间网络：
 
 ```bash
-curl -f http://127.0.0.1:${ABOT_RECON_PORT:-8081}/health
+curl -f http://127.0.0.1:8081/health
 
 docker compose -p gussian \
   -f docker/compose-gussian.yml \
