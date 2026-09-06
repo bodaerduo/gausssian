@@ -23,6 +23,7 @@ MAX_FRAMES = int(os.getenv("ABOT_RECON_MAX_FRAMES", "22000"))
 PREVIEW_FRAME_STRIDE = max(1, int(os.getenv("ABOT_RECON_PREVIEW_FRAME_STRIDE", "8")))
 POINT_STRIDE = max(1, int(os.getenv("ABOT_RECON_POINT_STRIDE", "8")))
 MAX_PREVIEW_POINTS = max(10_000, int(os.getenv("ABOT_RECON_MAX_PREVIEW_POINTS", "250000")))
+WINDOW_FRAMES = max(12, int(os.getenv("ABOT_RECON_WINDOW_FRAMES", "32")))
 
 app = FastAPI(title="ABot-Recon Worker", version="0.1.0")
 executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="abot-recon")
@@ -94,6 +95,34 @@ def prepare_frames(source: Path, work_dir: Path, quality: str) -> list[Path]:
     return sorted(frame_dir.glob("*.jpg"))[:MAX_FRAMES]
 
 
+def iter_frame_batches(source: Path, work_dir: Path, quality: str) -> Any:
+    """Decode a video in bounded windows so inference can start before EOF."""
+    if source.is_dir():
+        frames = sorted(path for path in source.iterdir() if path.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"})[:MAX_FRAMES]
+        for offset in range(0, len(frames), WINDOW_FRAMES):
+            yield offset, frames[offset:offset + WINDOW_FRAMES]
+        return
+    if not source.is_file():
+        raise FileNotFoundError(source)
+    fps = {"fast": 2, "balanced": 4, "high": 6}.get(quality, 4)
+    batch_seconds = WINDOW_FRAMES / fps
+    frame_root = work_dir / "frames"
+    frame_root.mkdir(parents=True, exist_ok=True)
+    offset = 0
+    while offset < MAX_FRAMES:
+        batch_dir = frame_root / f"batch-{offset:06d}"
+        batch_dir.mkdir(parents=True, exist_ok=True)
+        command = [FFMPEG_BIN, "-hide_banner", "-loglevel", "error", "-ss", f"{offset / fps:.3f}", "-t", f"{batch_seconds:.3f}", "-i", str(source), "-vf", f"fps={fps}", "-q:v", "2", str(batch_dir / "%06d.jpg")]
+        subprocess.run(command, check=True, timeout=3600)
+        frames = sorted(batch_dir.glob("*.jpg"))
+        if not frames:
+            break
+        yield offset, frames[:WINDOW_FRAMES]
+        offset += len(frames)
+        if len(frames) < WINDOW_FRAMES:
+            break
+
+
 def write_ply(path: Path, points: np.ndarray, colors: np.ndarray) -> int:
     valid = np.isfinite(points).all(axis=1)
     points = points[valid]
@@ -120,6 +149,46 @@ def tensor_points(value: Any) -> np.ndarray:
     if tensor.ndim != 4 or tensor.shape[-1] != 3:
         raise ValueError(f"ABot 点图形状不支持：{tuple(tensor.shape)}")
     return tensor.numpy()
+
+
+def tensor_poses(value: Any) -> np.ndarray:
+    tensor = value.detach().float().cpu().numpy() if isinstance(value, torch.Tensor) else np.asarray(value, dtype=np.float32)
+    if tensor.ndim != 3 or tensor.shape[-2:] != (4, 4):
+        raise ValueError(f"ABot 相机位姿形状不支持：{tuple(tensor.shape)}")
+    return tensor
+
+
+def transform_points(points: np.ndarray, transform: np.ndarray) -> np.ndarray:
+    flat = points.reshape(-1, 3)
+    homogeneous = np.concatenate([flat, np.ones((len(flat), 1), dtype=np.float32)], axis=1)
+    return (homogeneous @ transform.T)[:, :3].reshape(points.shape)
+
+
+def publish_preview_batch(job_id: str, result: Any, preview_dir: Path, preview_index: int, frame_offset: int, total_frames: int, accumulated: list[np.ndarray], trajectory: list[list[float]], global_anchor: np.ndarray | None) -> tuple[int, np.ndarray | None]:
+    points_value = result.world_points if result.world_points is not None else result.local_points
+    if points_value is None:
+        raise ValueError("ABot 未返回点图")
+    point_maps = tensor_points(points_value)
+    poses = tensor_poses(result.camera_poses)
+    alignment = np.eye(4, dtype=np.float32) if global_anchor is None or not len(poses) else global_anchor @ np.linalg.inv(poses[0])
+    if len(poses):
+        transformed_poses = np.einsum("ij,njk->nik", alignment, poses)
+        trajectory.extend(transformed_poses[:, :3, 3].tolist())
+    points = point_maps[:, ::POINT_STRIDE, ::POINT_STRIDE].reshape(-1, 3)
+    transformed = transform_points(points, alignment)
+    accumulated.append(transformed)
+    merged = np.concatenate(accumulated, axis=0)
+    span = np.max(np.abs(merged), axis=0) if len(merged) else np.ones(3)
+    colors = np.tile(np.clip((merged / np.maximum(span, 1e-6) + 1) * 127.5, 0, 255).astype(np.uint8), (1, 1))
+    preview_name = f"points-{preview_index + 1:04d}.ply"
+    count = write_ply(preview_dir / preview_name, merged, colors)
+    confidence = None
+    if result.confidence is not None:
+        confidence = round(float(result.confidence.detach().float().mean().cpu()), 4)
+    progress = round((frame_offset + len(point_maps)) / max(1, total_frames) * 90) + 8
+    add_event(job_id, progress=max(20, min(95, progress)), message=f"已生成第 {frame_offset + len(point_maps)} 帧点云", frame=frame_offset + len(point_maps), point_count=count, confidence=confidence, preview_url=f"/api/v1/reconstructions/{job_id}/preview/{preview_name}")
+    (preview_dir / "trajectory.json").write_text(json.dumps({"poses": trajectory}, ensure_ascii=False), encoding="utf-8")
+    return count, transformed_poses[-1] if len(transformed_poses) else global_anchor
 
 
 def publish_previews(job_id: str, result: Any, preview_dir: Path) -> None:
@@ -154,14 +223,26 @@ def run_job(job_id: str, request: JobRequest) -> None:
         output_dir = safe_shared_path(request.output_dir)
         preview_dir = safe_shared_path(request.preview_dir)
         work_dir = output_dir / "runtime"
-        add_event(job_id, progress=5, message="准备视频帧")
-        frames = prepare_frames(source, work_dir, request.quality)
-        if not frames:
+        add_event(job_id, progress=5, message="开始按窗口解码视频帧")
+        batches = iter_frame_batches(source, work_dir, request.quality)
+        model_instance = load_model()
+        accumulated: list[np.ndarray] = []
+        trajectory: list[list[float]] = []
+        global_anchor: np.ndarray | None = None
+        preview_index = 0
+        seen_frames = 0
+        total_hint = MAX_FRAMES
+        for frame_offset, frames in batches:
+            if not frames:
+                continue
+            result = model_instance.infer(frames, output_local_points=True, output_world_points=True, output_confidence=True, loop_closure=False)
+            _, global_anchor = publish_preview_batch(job_id, result, preview_dir, preview_index, frame_offset, total_hint, accumulated, trajectory, global_anchor)
+            preview_index += 1
+            seen_frames = frame_offset + len(frames)
+            if seen_frames >= MAX_FRAMES:
+                break
+        if not preview_index:
             raise ValueError("没有找到可推理的视频帧")
-        add_event(job_id, progress=12, message=f"已准备 {len(frames)} 帧，加载 ABot 模型")
-        result = load_model().infer(frames, output_local_points=True, output_world_points=True, output_confidence=True, loop_closure=False)
-        add_event(job_id, progress=18, message="推理完成，开始发布增量点云")
-        publish_previews(job_id, result, preview_dir)
         with jobs_lock:
             jobs[job_id].update({"status": "completed", "progress": 100, "message": "ABot 预览完成"})
     except Exception as exc:  # noqa: BLE001 - worker boundary
