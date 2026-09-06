@@ -17,6 +17,7 @@ app → http://abot-worker:8091 → ABot-Recon → preview/*.ply
 - 主服务由 `docker/compose-gussian.yml` 启动，服务名为 `app`
 - 宿主机已安装 NVIDIA Container Toolkit
 - GPU 容器内可以执行 `nvidia-smi`
+- 宿主机预留模型目录：`runtime/models/abot-recon`
 
 ## 1. 检查基础镜像
 
@@ -30,6 +31,13 @@ docker run --rm --gpus all gaussian:deps bash -lc 'ffmpeg -version | head -1'
 
 `gaussian:deps` 已包含 CUDA 12.4.1 和 FFmpeg，但当前实测不包含 Torch；Torch 会在 ABot Worker 容器内单独安装。
 
+模型不写入镜像。将完整的 `acvlab/ABot-Recon` 模型目录复制到宿主机：
+
+```bash
+mkdir -p runtime/models/abot-recon
+# 将模型配置和权重文件复制到 runtime/models/abot-recon/
+```
+
 ## 2. 启动手动安装模式
 
 `compose-abot.yml` 默认使用 `gaussian:deps`，并通过 `ABOT_RECON_MANUAL=true` 让 Worker 保持休眠，便于手动安装：
@@ -37,6 +45,8 @@ docker run --rm --gpus all gaussian:deps bash -lc 'ffmpeg -version | head -1'
 ```bash
 export ABOT_RECON_IMAGE=gaussian:deps
 export ABOT_RECON_MANUAL=true
+export ABOT_RECON_MODEL_DIR="$PWD/runtime/models/abot-recon"
+export ABOT_RECON_MODEL=/models/abot-recon
 
 docker compose -p gussian \
   -f docker/compose-gussian.yml \
@@ -116,18 +126,24 @@ PY
 
 期望看到 `torch: 2.5.1+cu121` 和 `cuda available: True`。
 
-## 6. 下载并缓存模型
+## 6. 验证宿主机模型挂载
 
-Compose 已将 `abot-huggingface` 挂载到 `/root/.cache/huggingface`。执行一次模型加载，提前下载权重：
+Compose 会把宿主机的 `runtime/models/abot-recon` 以只读方式挂载到容器 `/models/abot-recon`。确认容器内能看到模型文件：
 
 ```bash
-export HF_HOME=/root/.cache/huggingface
+ls -lah /models/abot-recon
+```
+
+使用本地路径加载，不访问 Hugging Face：
+
+```bash
+export ABOT_RECON_MODEL=/models/abot-recon
 
 /opt/venvs/abot/bin/python - <<'PY'
 from abot_recon import ABotRecon
 
 model = ABotRecon.from_pretrained(
-    "acvlab/ABot-Recon",
+    "/models/abot-recon",
     device="cuda",
     attention_backend="auto",
     amp_dtype="bf16",
@@ -137,18 +153,10 @@ model = ABotRecon.from_pretrained(
     output_confidence=True,
     loop_closure=False,
 )
-print("ABot-Recon checkpoint loaded")
+print("ABot-Recon local checkpoint loaded")
 del model
 PY
 ```
-
-检查缓存是否产生：
-
-```bash
-find /root/.cache/huggingface -maxdepth 3 -type f | head -20
-```
-
-第一次加载会下载权重，耗时较长是正常现象。后续任务会复用该 Docker volume。
 
 ## 7. 提交已验收镜像
 
@@ -158,7 +166,7 @@ find /root/.cache/huggingface -maxdepth 3 -type f | head -20
 exit
 ```
 
-在宿主机提交当前 ABot 容器。模型权重保留在 `abot-huggingface` volume，不写进镜像：
+在宿主机提交当前 ABot 容器。模型权重位于宿主机挂载目录，不写进镜像：
 
 ```bash
 export ABOT_RECON_IMAGE=gaussian/abot-recon:cuda12.4-abot-20260906
@@ -253,13 +261,15 @@ docker run --rm --gpus all gaussian:deps nvidia-smi
 
 如果失败，是宿主机 NVIDIA Container Toolkit 问题；如果成功，重新检查是否安装了 `cu121` wheel。
 
-### 模型下载失败
+### 本地模型目录为空
 
-检查 `abot-huggingface` 是否存在并可写：
+确认宿主机模型目录存在且包含配置和权重文件：
 
 ```bash
-docker volume inspect gussian_abot-huggingface
+find runtime/models/abot-recon -maxdepth 2 -type f | head -20
 ```
+
+Compose 默认将该目录挂载到 `/models/abot-recon`；模型不需要写进镜像。
 
 ### 主 API 无法调用 Worker
 

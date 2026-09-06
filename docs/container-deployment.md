@@ -100,7 +100,7 @@ docker compose -p gussian -f docker/compose-gussian.yml -f docker/compose-abot.y
 
 该覆盖文件只新增 `abot-worker`，并给主 API 注入 `ABOT_RECON_URL=http://abot-worker:8091`；现有 Brush/COLMAP 容器仍使用原来的 CUDA 12.4 镜像和生产命令。两个容器共享 `gaussian-data`，因此 Worker 可以读取主 API 保存的视频，并把 `preview/*.ply` 写回同一个任务目录，但 Python、PyTorch 和 CUDA 用户态库完全隔离。
 
-首次构建会安装 ABot-Recon 的独立环境（PyTorch 2.5.1 + cu121），并在第一次任务时从 Hugging Face 缓存模型权重。若服务器不能访问 Hugging Face，可通过 `ABOT_RECON_MODEL` 指向已经挂载到 Worker 的本地模型目录。
+首次安装会配置 ABot-Recon 的独立环境（PyTorch 2.5.1 + cu121）。模型默认从宿主机 `runtime/models/abot-recon` 只读挂载到 Worker 的 `/models/abot-recon`，通过 `ABOT_RECON_MODEL` 可覆盖为其他本地目录或 Hub ID。
 
 ### POC 验收
 
